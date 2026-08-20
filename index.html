@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión Diaria de Trabajos de Alto Riesgo</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">U</div>
+    <div>
+      <strong>UNACEM</strong>
+      <small>Gestión diaria de trabajos de alto riesgo</small>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span id="syncStatus" class="pill neutral">Modo demo</span>
+    <button class="icon-btn" id="btnSettings" title="Configurar conexión">⚙</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-view="inicio">Inicio</button>
+  <button class="tab" data-view="registro">Registro de Alto Riesgo</button>
+  <button class="tab" data-view="conexas">Coordinación Conexa</button>
+  <button class="tab" data-view="mapa">Mapa Interactivo</button>
+  <button class="tab" data-view="lista">Lista y Dashboard</button>
+</nav>
+
+<main>
+  <!-- INICIO -->
+  <section id="view-inicio" class="view active">
+    <div class="page-head">
+      <div>
+        <h1>Resumen del día</h1>
+        <p>Visibilidad diaria de actividades de alto riesgo, personal expuesto y coordinaciones conexas.</p>
+      </div>
+      <div class="inline-fields">
+        <label>Fecha <input id="fechaResumen" type="date"></label>
+        <button class="btn secondary" id="btnRefresh">Actualizar</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <article class="kpi"><span>Trabajos activos</span><strong id="kpiTrabajos">0</strong></article>
+      <article class="kpi"><span>Trabajadores involucrados</span><strong id="kpiTrabajadores">0</strong></article>
+      <article class="kpi"><span>Empresas activas</span><strong id="kpiEmpresas">0</strong></article>
+      <article class="kpi"><span>Nº trabajos conexos</span><strong id="kpiConexos">0</strong></article>
+      <article class="kpi"><span>Riesgos críticos</span><strong id="kpiRiesgos">0</strong></article>
+    </div>
+
+    <div class="grid two">
+      <article class="card">
+        <div class="card-head"><h2>Trabajos críticos del día</h2></div>
+        <canvas id="chartCriticos" height="190"></canvas>
+      </article>
+      <article class="card">
+        <div class="card-head"><h2>Riesgos críticos detectados</h2></div>
+        <canvas id="chartRiesgos" height="190"></canvas>
+      </article>
+    </div>
+
+    <article class="card">
+      <div class="card-head">
+        <h2>Áreas con mayor actividad</h2>
+        <button class="link-btn" data-go="mapa">Ver en mapa</button>
+      </div>
+      <div id="areasMayorActividad" class="activity-chips"></div>
+    </article>
+  </section>
+
+  <!-- REGISTRO -->
+  <section id="view-registro" class="view">
+    <div class="page-head">
+      <div>
+        <h1>Registro de trabajo de alto riesgo</h1>
+        <p>Registro diario con ubicación en el plano, trazabilidad, continuación y cierre anticipado.</p>
+      </div>
+      <button class="btn secondary" id="btnBuscarAnterior">Continuar actividad anterior</button>
+    </div>
+
+    <div class="grid registro-layout">
+      <form id="formRegistro" class="card form-card">
+        <input type="hidden" id="registroId">
+        <input type="hidden" id="mapX">
+        <input type="hidden" id="mapY">
+
+        <div class="form-grid cols-2">
+          <label>Empresa*
+            <select id="empresa" required></select>
+          </label>
+          <label>Área usuaria*
+            <select id="areaUsuaria" required></select>
+          </label>
+        </div>
+
+        <div class="form-grid cols-2">
+          <div class="field">
+            <span class="label">Trabajo crítico* <small>(selección múltiple)</small></span>
+            <div id="trabajosCriticos" class="multi-box"></div>
+          </div>
+          <div class="field">
+            <span class="label">Riesgos críticos detectados* <small>(selección múltiple)</small></span>
+            <div id="riesgosCriticos" class="multi-box"></div>
+          </div>
+        </div>
+
+        <div class="form-grid cols-2">
+          <label>Lugar / Sector*
+            <select id="lugar" required></select>
+          </label>
+          <div class="field map-choice">
+            <span class="label">Ubicación en plano</span>
+            <button type="button" class="btn secondary" id="btnElegirMapa">Seleccionar dando clic al mapa</button>
+            <small id="mapCoordText">Sin ubicación seleccionada</small>
+          </div>
+        </div>
+
+        <div class="form-grid cols-3">
+          <label>Fecha* <input id="fecha" type="date" required></label>
+          <label>Hora de inicio* <input id="horaInicio" type="time" required></label>
+          <label>Hora de término estimada* <input id="horaTermino" type="time" required></label>
+        </div>
+
+        <div class="form-grid cols-2">
+          <label>Nº de trabajadores*
+            <input id="nTrabajadores" type="number" min="1" value="1" required>
+          </label>
+          <label>¿Se trabajará cerca a otras actividades conexas?*
+            <select id="tieneConexas" required>
+              <option value="NO">NO</option>
+              <option value="SI">SI</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Descripción del trabajo*
+          <textarea id="descripcion" rows="4" required placeholder="Describa la actividad a ejecutar"></textarea>
+        </label>
+
+        <div id="conexasQuick" class="subcard hidden">
+          <div class="subcard-head">
+            <div>
+              <strong>Actividad conexa inicial</strong>
+              <small>Puede ampliarla posteriormente desde “Coordinación Conexa”.</small>
+            </div>
+            <button type="button" class="btn mini" id="btnAgregarConexaQuick">+ Agregar empresa conexa</button>
+          </div>
+          <div id="conexasQuickList"></div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn secondary" id="btnGuardarBorrador">Guardar borrador local</button>
+          <button type="submit" class="btn primary">Registrar y generar PDF</button>
+        </div>
+      </form>
+
+      <article class="card map-card">
+        <div class="card-head">
+          <div>
+            <h2>Plano – Planta Nueva</h2>
+            <small>Seleccione el sector desde la lista o haga clic directamente sobre el plano.</small>
+          </div>
+          <button class="btn mini secondary" id="btnResetMarker" type="button">Limpiar punto</button>
+        </div>
+        <div id="mapRegistro" class="plant-map interactive">
+          <img src="assets/mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+          <div class="map-marker hidden" id="registroMarker"><span></span></div>
+        </div>
+        <div class="legend">
+          <span><i class="dot green"></i> Sin / baja carga</span>
+          <span><i class="dot yellow"></i> 1–2 trabajos</span>
+          <span><i class="dot orange"></i> 3–4 trabajos</span>
+          <span><i class="dot red"></i> 5 o más trabajos</span>
+        </div>
+      </article>
+    </div>
+
+    <article class="card">
+      <div class="card-head">
+        <div><h2>Mis registros del día</h2><small>Editar, agregar coordinación conexa, finalizar o continuar al día siguiente.</small></div>
+        <div class="inline-fields compact">
+          <label>Empresa <select id="filtroMisEmpresa"></select></label>
+          <label>Fecha <input id="filtroMisFecha" type="date"></label>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Empresa</th><th>Lugar</th><th>Trabajo crítico</th><th>Horario</th><th>Trabajadores</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaMisRegistros"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <!-- CONEXAS -->
+  <section id="view-conexas" class="view">
+    <div class="page-head">
+      <div>
+        <h1>Coordinación de actividades conexas</h1>
+        <p>Actualiza en cualquier momento la coordinación con una o varias empresas que desarrollan trabajos aledaños o conexos.</p>
+      </div>
+    </div>
+
+    <div class="grid conexa-layout">
+      <form id="formConexa" class="card form-card">
+        <div class="form-grid cols-3">
+          <label>Mi empresa*
+            <select id="conMiEmpresa" required></select>
+          </label>
+          <label>Fecha*
+            <input id="conFecha" type="date" required>
+          </label>
+          <label>Hora de gestión*
+            <input id="conHora" type="time" required>
+          </label>
+        </div>
+
+        <label>Actividad propia reportada*
+          <select id="conRegistroPropio" required></select>
+        </label>
+
+        <div class="subcard">
+          <strong>Responsables de mi empresa</strong>
+          <div class="form-grid cols-2 mt-10">
+            <label>Jefe del área de trabajo*
+              <input id="conJefePropio" required>
+            </label>
+            <label>Supervisor SSOMA*
+              <input id="conSsomaPropio" required>
+            </label>
+          </div>
+        </div>
+
+        <div class="section-title-row">
+          <h3>Empresas conexas</h3>
+          <button type="button" id="btnAgregarEmpresaConexa" class="btn mini">+ Agregar empresa conexa</button>
+        </div>
+        <div id="empresasConexas"></div>
+
+        <label>Observaciones / acuerdos generales
+          <textarea id="conObservaciones" rows="3" placeholder="Acuerdos de coordinación, secuencia, horarios, rutas, radios, delimitaciones, etc."></textarea>
+        </label>
+
+        <div class="actions">
+          <button type="submit" class="btn primary">Guardar coordinación y enviar PDF</button>
+        </div>
+      </form>
+
+      <article class="card">
+        <div class="card-head"><h2>Ubicación de la actividad propia</h2></div>
+        <div id="mapConexa" class="plant-map">
+          <img src="assets/mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+          <div class="map-marker hidden" id="conexaMarker"><span></span></div>
+        </div>
+        <div class="info-box">
+          <strong>Historial</strong>
+          <p>Cada inclusión, actualización o culminación se registra en la pestaña <b>Historial</b> de Google Sheets.</p>
+        </div>
+      </article>
+    </div>
+
+    <article class="card">
+      <div class="card-head">
+        <h2>Coordinaciones conexas registradas</h2>
+        <div class="inline-fields compact">
+          <label>Empresa <select id="filtroConEmpresa"></select></label>
+          <label>Fecha <input id="filtroConFecha" type="date"></label>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Registro</th><th>Mi empresa</th><th>Empresas conexas</th><th>Hora gestión</th><th>Actualizado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaConexas"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <!-- MAPA -->
+  <section id="view-mapa" class="view">
+    <div class="page-head">
+      <div>
+        <h1>Mapa interactivo</h1>
+        <p>Sectorización de la carga de trabajos de alto riesgo en tiempo diario.</p>
+      </div>
+      <div class="inline-fields compact map-filters">
+        <label>Trabajo crítico <select id="mapFiltroTrabajo"><option value="">Todos</option></select></label>
+        <label>Empresa <select id="mapFiltroEmpresa"><option value="">Todas</option></select></label>
+        <label>Área usuaria <select id="mapFiltroArea"><option value="">Todas</option></select></label>
+        <label>Fecha <input id="mapFiltroFecha" type="date"></label>
+      </div>
+    </div>
+
+    <div class="grid map-dashboard">
+      <article class="card map-card">
+        <div class="card-head">
+          <h2>Plano sectorizado</h2>
+          <div class="legend">
+            <span><i class="dot green"></i> Sin trabajos</span>
+            <span><i class="dot yellow"></i> 1–2</span>
+            <span><i class="dot orange"></i> 3–4</span>
+            <span><i class="dot red"></i> 5+</span>
+          </div>
+        </div>
+        <div id="mapGeneral" class="plant-map interactive overview">
+          <img src="assets/mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+          <div id="sectorMarkers"></div>
+        </div>
+      </article>
+
+      <aside class="card sector-panel">
+        <div id="sectorEmpty">
+          <h2>Detalle del sector</h2>
+          <p>Seleccione un marcador o sector del plano.</p>
+        </div>
+        <div id="sectorDetail" class="hidden">
+          <div class="sector-title"><h2 id="sectorNombre">Sector</h2><span id="sectorBadge" class="load-badge"></span></div>
+          <div class="mini-kpis">
+            <div><span>Trabajos</span><strong id="sectorTrabajos">0</strong></div>
+            <div><span>Trabajadores</span><strong id="sectorTrabajadores">0</strong></div>
+            <div><span>Empresas</span><strong id="sectorEmpresas">0</strong></div>
+            <div><span>Conexos</span><strong id="sectorConexos">0</strong></div>
+          </div>
+          <h3>Actividades</h3>
+          <div id="sectorActividades" class="stack-list"></div>
+          <button class="btn secondary full" id="btnSectorDashboard">Abrir dashboard del sector</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- LISTA/DASHBOARD -->
+  <section id="view-lista" class="view">
+    <div class="page-head">
+      <div>
+        <h1>Lista de trabajos y dashboard por sector</h1>
+        <p>Dos tablas independientes: trabajos de alto riesgo y coordinaciones conexas.</p>
+      </div>
+    </div>
+
+    <div class="filters card">
+      <label>Empresa <select id="listaEmpresa"><option value="">Todas</option></select></label>
+      <label>Lugar <select id="listaLugar"><option value="">Todos</option></select></label>
+      <label>Área usuaria <select id="listaArea"><option value="">Todas</option></select></label>
+      <label>Fecha <input id="listaFecha" type="date"></label>
+      <button class="btn secondary" id="btnLimpiarFiltros">Limpiar</button>
+    </div>
+
+    <article class="card">
+      <div class="card-head"><h2>Registros de actividades de alto riesgo</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Fecha</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Trabajo crítico</th><th>Riesgos críticos</th><th>Trabajadores</th></tr></thead>
+          <tbody id="tablaRegistros"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><h2>Registros de trabajos conexos</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Fecha</th><th>Mi empresa</th><th>Lugar</th><th>Empresas conexas</th><th>Actividad</th><th>Riesgos generados</th><th>Hora gestión</th></tr></thead>
+          <tbody id="tablaListaConexas"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <div class="grid two">
+      <article class="card">
+        <div class="card-head"><h2 id="dashSectorTitle">Dashboard general</h2></div>
+        <canvas id="chartSectorCriticos" height="210"></canvas>
+      </article>
+      <article class="card">
+        <div class="card-head"><h2>Trabajadores por empresa</h2></div>
+        <canvas id="chartSectorEmpresa" height="210"></canvas>
+      </article>
+    </div>
+  </section>
+</main>
+
+<!-- Modal conexión -->
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>Conexión con Google Apps Script</h2>
+      <button class="icon-btn" id="closeSettings">✕</button>
+    </div>
+    <p>Pegue la URL del Web App desplegado en Google Apps Script. Si se deja vacío, la app trabaja en modo demo/local.</p>
+    <label>URL Web App
+      <input id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXXX/exec">
+    </label>
+    <div class="actions">
+      <button class="btn secondary" id="btnDemoData">Restablecer demo</button>
+      <button class="btn primary" id="btnSaveSettings">Guardar conexión</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal continuar -->
+<div id="continueModal" class="modal hidden">
+  <div class="modal-card wide">
+    <div class="modal-head">
+      <h2>Continuar actividad anterior</h2>
+      <button class="icon-btn" id="closeContinue">✕</button>
+    </div>
+    <div class="form-grid cols-2">
+      <label>Empresa <select id="contEmpresa"></select></label>
+      <label>Fecha anterior <input id="contFecha" type="date"></label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Empresa</th><th>Lugar</th><th>Trabajo</th><th>Trabajadores</th><th>Acción</th></tr></thead>
+        <tbody id="tablaContinuar"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PDF render -->
+<div id="pdfSheet" class="pdf-sheet">
+  <div class="pdf-header">
+    <div class="pdf-logo">UNACEM</div>
+    <div><h2 id="pdfTitle">REGISTRO DE TRABAJO DE ALTO RIESGO</h2><p id="pdfSubtitle">Gestión diaria</p></div>
+  </div>
+  <div id="pdfContent"></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
