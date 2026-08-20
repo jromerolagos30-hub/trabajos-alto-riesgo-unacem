@@ -307,14 +307,14 @@ async function buildPdfRegistro(r,quick=[]){
   ${pdfField("Fecha",r.Fecha)}${pdfField("Horario",`${r.HoraInicio} – ${r.HoraTermino}`)}${pdfField("Nº trabajadores",r.NTrabajadores)}${pdfField("Actividades conexas",r.Conexas)}
   ${pdfField("Descripción del trabajo",r.Descripcion)}${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}
   </div>${quick.length?`<h3>Actividades conexas reportadas al inicio</h3>${quick.map(x=>`<div class="pdf-conexa"><b>${x.empresa}</b><br>Actividad: ${x.actividad}<br>Riesgos: ${x.riesgos.join(", ")}</div>`).join("")}`:""}
-  <h3>Ubicación en plano</h3><div class="pdf-map"><img src="assets/mapa_planta_nueva.png"><span class="pdf-pin" style="left:${r.X}%;top:${r.Y}%"></span></div>`;
+  <h3>Ubicación en plano</h3><div class="pdf-map"><img src="mapa_planta_nueva.png"><span class="pdf-pin" style="left:${r.X}%;top:${r.Y}%"></span></div>`;
   return renderPdfAndDownload(`${r.ID}_Trabajo_Alto_Riesgo.pdf`)
 }
 async function buildPdfConexa(c,r){
   qs("pdfTitle").textContent="COORDINACIÓN DE TRABAJOS DE ALTO RIESGO EN ÁREAS ALEDAÑAS O CONEXAS";qs("pdfSubtitle").textContent=`ID ${c.ID} · ${c.Fecha} · ${c.HoraGestion}`;
   qs("pdfContent").innerHTML=`<div class="pdf-content-grid">${pdfField("Mi empresa",c.MiEmpresa)}${pdfField("Lugar",c.Lugar)}${pdfField("Actividad propia",r.Descripcion)}${pdfField("Trabajo crítico propio",arr(r.TrabajoCritico).join(", "))}${pdfField("Jefe del área propio",c.JefePropio)}${pdfField("Supervisor SSOMA propio",c.SsomaPropio)}</div>
   <h3>Empresas / actividades conexas</h3>${c.EmpresasConexas.map(x=>`<div class="pdf-conexa"><b>${x.empresa}</b><br><b>Actividad:</b> ${x.actividad}<br><b>Riesgos que mi actividad genera:</b> ${x.riesgos.join(", ")}<br><b>Controles específicos:</b> ${x.controles}<br><b>Jefe notificado:</b> ${x.jefe}<br><b>SSOMA notificado:</b> ${x.ssoma}</div>`).join("")}
-  <div class="pdf-conexa"><b>Observaciones / acuerdos:</b><br>${c.Observaciones||"—"}</div><h3>Ubicación en plano</h3><div class="pdf-map"><img src="assets/mapa_planta_nueva.png"><span class="pdf-pin" style="left:${r.X}%;top:${r.Y}%"></span></div>`;
+  <div class="pdf-conexa"><b>Observaciones / acuerdos:</b><br>${c.Observaciones||"—"}</div><h3>Ubicación en plano</h3><div class="pdf-map"><img src="mapa_planta_nueva.png"><span class="pdf-pin" style="left:${r.X}%;top:${r.Y}%"></span></div>`;
   return renderPdfAndDownload(`${c.ID}_Coordinacion_Conexa.pdf`)
 }
 function pdfField(k,v){return `<div class="pdf-field"><strong>${escapeHtml(k)}</strong>${escapeHtml(String(v??""))}</div>`}
