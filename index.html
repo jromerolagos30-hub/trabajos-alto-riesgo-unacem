@@ -15,15 +15,10 @@
 <body>
 <header class="topbar">
   <div class="brand">
-    <div class="brand-mark">U</div>
-    <div>
-      <strong>UNACEM</strong>
+    <img class="brand-logo" src="logo_unacem.jpg" alt="UNACEM">
+    <div class="brand-copy">
       <small>Gestión diaria de trabajos de alto riesgo</small>
     </div>
-  </div>
-  <div class="top-actions">
-    <span id="syncStatus" class="pill neutral">Modo demo</span>
-    <button class="icon-btn" id="btnSettings" title="Configurar conexión">⚙</button>
   </div>
 </header>
 
@@ -492,24 +487,6 @@
   </section>
 
 </main>
-
-<!-- Modal conexión -->
-<div id="settingsModal" class="modal hidden">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h2>Conexión con Google Apps Script</h2>
-      <button class="icon-btn" id="closeSettings">✕</button>
-    </div>
-    <p>Pegue la URL del Web App desplegado en Google Apps Script. Si se deja vacío, la app trabaja en modo demo/local.</p>
-    <label>URL Web App
-      <input id="apiUrlInput" placeholder="https://script.google.com/macros/s/XXXXX/exec">
-    </label>
-    <div class="actions">
-      <button class="btn secondary" id="btnDemoData">Restablecer demo</button>
-      <button class="btn primary" id="btnSaveSettings">Guardar conexión</button>
-    </div>
-  </div>
-</div>
 
 <!-- Modal continuar -->
 <div id="continueModal" class="modal hidden">

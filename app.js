@@ -68,7 +68,8 @@ const DEMO_CONEXAS = [
   {ID:"C-2001",RegistroID:"R-1001",Fecha:today(),HoraGestion:"09:20",MiEmpresa:"FGA INGENIEROS S.A.",Lugar:"GSA 1",JefePropio:"Responsable FGA",SsomaPropio:"SSOMA FGA",EmpresasConexas:[{empresa:"CORMEI",actividad:"Soldadura de soportes",riesgos:["Proyección de partículas incandescentes"],controles:"Delimitación, pantallas ignífugas y coordinación de secuencia.",jefe:"Jefe CORMEI",ssoma:"SSOMA CORMEI"}],Observaciones:"Mantener comunicación permanente.",Actualizado:new Date().toLocaleString()}
 ];
 
-let CONFIG = { apiUrl: localStorage.getItem("tar_api_url") || "" };
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyzaT1pwPr4t2Z7zLnwZDBs0xLwZ4_cH7CBfjiGX7g54GyF012VcDz_LyGDG6Gel6mZOQ/exec";
+let CONFIG = { apiUrl: APPS_SCRIPT_URL };
 let DATA = structuredClone(DEFAULT_DATA);
 let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || structuredClone(DEMO_REGISTROS);
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
@@ -98,7 +99,7 @@ function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
   qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
   wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion(); renderConfig(); refreshAll();
-  if(CONFIG.apiUrl) loadRemote();
+  loadRemote();
 }
 
 function wireNavigation(){
@@ -116,11 +117,7 @@ function showView(name){
 }
 
 function wireEvents(){
-  qs("btnSettings").onclick=()=>{qs("apiUrlInput").value=CONFIG.apiUrl;qs("settingsModal").classList.remove("hidden")};
-  qs("closeSettings").onclick=()=>qs("settingsModal").classList.add("hidden");
-  qs("btnSaveSettings").onclick=()=>{CONFIG.apiUrl=qs("apiUrlInput").value.trim();localStorage.setItem("tar_api_url",CONFIG.apiUrl);qs("settingsModal").classList.add("hidden");renderConfig(); if(CONFIG.apiUrl) loadRemote()};
-  qs("btnDemoData").onclick=()=>{localStorage.removeItem("tar_api_url");localStorage.removeItem("tar_registros");localStorage.removeItem("tar_conexas");location.reload()};
-  qs("btnRefresh").onclick=()=>refreshAll();
+  qs("btnRefresh").onclick=async()=>{await loadRemote();refreshAll();toast("Información actualizada")};
   qs("fechaResumen").onchange=()=>renderResumen();
 
   qs("tieneConexas").onchange=()=>qs("conexasQuick").classList.toggle("hidden",qs("tieneConexas").value!=="SI");
@@ -148,8 +145,7 @@ function wireEvents(){
 }
 
 function renderConfig(){
-  qs("syncStatus").textContent=CONFIG.apiUrl?"Conectado a Apps Script":"Modo demo/local";
-  qs("syncStatus").className="pill "+(CONFIG.apiUrl?"ok":"neutral");
+  // V4.2: la conexión es interna y automática; no se muestra configuración al usuario.
 }
 
 function setOptions(id, values, placeholder){
@@ -478,9 +474,9 @@ async function postRemote(payload){
 }
 async function loadRemote(){
   try{
-    qs("syncStatus").textContent="Sincronizando...";
-    const res=await jsonp("bootstrap");if(res?.ok){DATA=res.data.config||DATA;
-      // Completa la geometría V3 con el catálogo local; X/Y del Sheet siguen siendo internos.
+    const res=await jsonp("bootstrap");
+    if(res?.ok){
+      DATA=res.data.config||DATA;
       DATA.lugares=(DATA.lugares||[]).map(l=>{
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
         return local?{...local,...l,rect:local?.rect}:l;
@@ -496,8 +492,14 @@ async function loadRemote(){
       if(userSectors.length){
         DATA.lugares=userSectors.map(s=>({nombre:s.nombre,x:s.x,y:s.y,rect:s.rect}));
       }
-      registros=res.data.registros?.length?res.data.registros:registros;conexas=res.data.conexas?.length?res.data.conexas:conexas;persist();refreshAll();qs("syncStatus").textContent="Sincronizado";qs("syncStatus").className="pill ok"}
-  }catch(e){qs("syncStatus").textContent="Sin conexión · modo local";qs("syncStatus").className="pill warn"}
+      registros=res.data.registros?.length?res.data.registros:registros;
+      conexas=res.data.conexas?.length?res.data.conexas:conexas;
+      persist();
+      refreshAll();
+    }
+  }catch(e){
+    console.warn("Sincronización automática no disponible temporalmente",e);
+  }
 }
 async function sendPdfRemote(base64,r,connectedCompanies=[],title="REGISTRO DE TRABAJO DE ALTO RIESGO"){
   return postRemote({action:"sendPdf",pdfBase64:base64,filename:`${r.ID}.pdf`,empresa:r.Empresa,connectedCompanies,title,registroId:r.ID})
@@ -646,5 +648,12 @@ window.deleteSectorConfig=async function(id,nombre){
   DATA.lugares=userSectors.map(x=>({nombre:x.nombre,x:x.x,y:x.y,rect:x.rect}));
   populateAllSelects();renderSectorZones();renderSectorConfigTable();renderMapGeneral();toast("Sector eliminado");
 }
+
+
+// Sincronización silenciosa: al abrir, al volver a la pestaña y cada 5 minutos.
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible") loadRemote();
+});
+setInterval(()=>{ if(document.visibilityState==="visible") loadRemote(); },300000);
 
 document.addEventListener("DOMContentLoaded",init);
