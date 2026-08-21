@@ -249,8 +249,8 @@ function pointInRect(x,y,rect){
   return Array.isArray(rect) && rect.length===4 && x>=rect[0] && x<=rect[2] && y>=rect[1] && y<=rect[3];
 }
 function findZoneAt(x,y){
-  // V4: usa prioritariamente la sectorización configurada por el administrador.
-  const source=(userSectors && userSectors.length)?userSectors:DATA.lugares;
+  // V4.1: solo reconoce sectores creados manualmente en la interfaz Sectorización.
+  const source=userSectors||[];
   const matches=source.filter(l=>pointInRect(x,y,l.rect));
   if(!matches.length) return null;
   matches.sort((a,b)=>{
@@ -414,7 +414,7 @@ function filteredForMap(){
 }
 function renderMapGeneral(){
   const rs=filteredForMap(),by={};rs.forEach(r=>(by[r.Lugar]??=[]).push(r));
-  qs("sectorMarkers").innerHTML=DATA.lugares.map(l=>{
+  qs("sectorMarkers").innerHTML=(userSectors||[]).map(l=>{
     const n=(by[l.nombre]||[]).length;
     const bg=n>=5?"rgba(228,61,48,.62)":n>=3?"rgba(242,138,26,.62)":n>=1?"rgba(243,198,35,.68)":"rgba(56,169,71,.52)";
     return `<button class="sector-marker ${n===0?"zero-sector":"active-sector"}" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
@@ -606,7 +606,7 @@ async function saveSectorConfig(){
 }
 function renderSectorZones(){
   const layer=qs("sectorZoneLayer");if(!layer)return;
-  const source=(userSectors&&userSectors.length)?userSectors:DATA.lugares.filter(s=>Array.isArray(s.rect));
+  const source=userSectors||[];
   layer.innerHTML=source.map(s=>{
     const r=s.rect;const w=r[2]-r[0],h=r[3]-r[1];
     return `<div class="sector-zone" style="left:${r[0]}%;top:${r[1]}%;width:${w}%;height:${h}%" title="${escapeHtml(s.nombre)}" onclick="event.stopPropagation();focusSectorConfig('${String(s.id||"").replaceAll("'","\\'")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')"><span>${escapeHtml(s.nombre)}</span></div>`
@@ -614,7 +614,7 @@ function renderSectorZones(){
 }
 function renderSectorConfigTable(){
   const q=(qs("sectorSearch")?.value||"").toLowerCase();
-  const source=(userSectors&&userSectors.length)?userSectors:DATA.lugares.filter(s=>Array.isArray(s.rect));
+  const source=userSectors||[];
   const rows=source.filter(s=>!q||s.nombre.toLowerCase().includes(q));
   qs("tablaSectoresConfig").innerHTML=rows.map(s=>`<tr><td>${escapeHtml(s.nombre)}</td><td>${escapeHtml(s.actualizado||"")}</td>
   <td><button class="btn mini secondary" onclick="editSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Editar</button>
@@ -622,7 +622,7 @@ function renderSectorConfigTable(){
   <button class="btn mini secondary" onclick="deleteSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Eliminar</button></td></tr>`).join("")||'<tr><td colspan="3">Sin sectores configurados.</td></tr>';
 }
 window.focusSectorConfig=function(id,nombre){
-  const s=(userSectors.length?userSectors:DATA.lugares).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
+  const s=(userSectors||[]).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
   const map=qs("mapSectorizacion");const stage=map.querySelector(".map-stage");
   if(map._zoom<2){map._zoom=2;stage.style.width="200%";map.querySelector(".zoom-value").textContent="200%"}
   setTimeout(()=>{
@@ -632,14 +632,14 @@ window.focusSectorConfig=function(id,nombre){
   },50);
 }
 window.editSectorConfig=function(id,nombre){
-  const s=(userSectors.length?userSectors:DATA.lugares).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
+  const s=(userSectors||[]).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
   qs("sectorEditId").value=s.id||"";qs("sectorTitulo").value=s.nombre;
   sectorDraftPoints=[[s.rect[0],s.rect[1]],[s.rect[2],s.rect[3]]];normalizeSectorDraft();focusSectorConfig(id,nombre);
   window.scrollTo({top:0,behavior:"smooth"});
 }
 window.deleteSectorConfig=async function(id,nombre){
   if(!confirm(`¿Eliminar el sector "${nombre}"?`))return;
-  const s=(userSectors.length?userSectors:DATA.lugares).find(x=>(id&&x.id===id)||x.nombre===nombre);
+  const s=(userSectors||[]).find(x=>(id&&x.id===id)||x.nombre===nombre);
   if(!s)return;
   userSectors=userSectors.filter(x=>x!==s);
   if(CONFIG.apiUrl)await postRemote({action:"deleteSector",password:"2026Unacem",id:s.id,nombre:s.nombre});
