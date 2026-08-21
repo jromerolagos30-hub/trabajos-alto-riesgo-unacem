@@ -14,3 +14,16 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
   .map-zoom-controls button{width:34px;height:34px}
   .sector-name{max-width:var(--sector-label-width,64px)}
 }
+
+/* V3 - mapa con zonas precisas */
+.sector-marker.zero-sector .sector-count{opacity:.34}
+.sector-marker.zero-sector .sector-name{opacity:0;pointer-events:none}
+.map-stage.zoom-detail .sector-marker.zero-sector .sector-name{opacity:.72}
+.map-stage.zoom-detail .sector-marker.zero-sector .sector-count{opacity:.48}
+.sector-marker.active-sector .sector-name{opacity:.92}
+.map-stage.zoom-deep .sector-name{background:#fffffff2;opacity:1!important}
+#mapRegistro .map-marker:after{font-size:8px}
+@media(max-width:700px){
+  #mapRegistro .map-marker:after{font-size:7px}
+  .sector-count{border-width:1px}
+}

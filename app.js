@@ -4,51 +4,57 @@ const DEFAULT_DATA = {
   riesgos:["Proyección de partículas incandescentes","Caída de objetos","Caída de carga","Contacto eléctrico"],
   areas:["DPA","DPRA","DIA"],
   lugares:[
-    {nombre:"PREHOMOGENEIZACION DE CEMENTO",x:16.0,y:18.4},
-    {nombre:"PREHOMOGENEIZACION DE CARBON",x:15.5,y:50.0},
-    {nombre:"ED. DE TRANSP. Y CRIBADO",x:34.8,y:21.2},
-    {nombre:"FILTROS DE MANGAS LINEA II",x:38.5,y:28.2},
-    {nombre:"FILTROS DE MANGAS LINEA I",x:38.8,y:34.3},
-    {nombre:"PRECALENT. 2",x:44.6,y:30.3},
-    {nombre:"S.E. GSA 2 Y SALA DE COMPRESORAS",x:48.4,y:25.7},
-    {nombre:"CASETA EQUIPO ANALIZADOR EN LINEA",x:48.0,y:20.6},
-    {nombre:"CHANCADORA DE CALIZA",x:52.8,y:21.4},
-    {nombre:"SUB ESTACION ZONA HORNO II",x:52.3,y:27.0},
-    {nombre:"FILTRO DE MANGAS",x:39.1,y:39.1},
-    {nombre:"HORNOS IDCAR",x:41.5,y:42.0},
-    {nombre:"GSA 1",x:33.6,y:43.4},
-    {nombre:"ED. ALIMENT.",x:36.4,y:43.4},
-    {nombre:"ED. DE COMP.",x:36.6,y:48.0},
-    {nombre:"SILOS DE CRUDOS",x:43.0,y:41.7},
-    {nombre:"SILOS DE CARBON",x:45.2,y:37.6},
-    {nombre:"SILOS DE HOMOGENEIZACION",x:44.6,y:49.2},
-    {nombre:"PRECALENTADOR",x:49.3,y:43.2},
-    {nombre:"EDIFICIO INTERCAMBIO",x:55.0,y:40.7},
-    {nombre:"DUCTO DE GASES TERCIARIOS",x:59.3,y:40.6},
-    {nombre:"HORNO",x:58.1,y:36.6},
-    {nombre:"TANQ. DIARIO DE PETRO.",x:63.4,y:42.0},
-    {nombre:"CONTROL LAB.",x:66.1,y:46.2},
-    {nombre:"ENFRIADOR I",x:72.1,y:42.3},
-    {nombre:"ENFRIADOR II",x:69.6,y:31.3},
-    {nombre:"ELECTROFILTRO DE ENFRIADOR I",x:78.4,y:34.7},
-    {nombre:"ELECTROFILTRO DE ENFRIADOR II",x:77.4,y:25.2},
-    {nombre:"MOLINOS DE BOLAS",x:61.1,y:54.2},
-    {nombre:"PRENSA DE CRUDOS N° 4",x:48.2,y:60.0},
-    {nombre:"PRENSA DE CRUDOS N° 3",x:53.7,y:60.0},
-    {nombre:"PRENSA DE CRUDOS N° 2",x:59.0,y:60.0},
-    {nombre:"PRENSA DE CRUDOS N° 1",x:64.5,y:60.0},
-    {nombre:"PRENSA DE CLINKER N° 1 Y 2",x:76.8,y:58.0},
-    {nombre:"SUB-EST. ELECT.",x:68.7,y:67.4},
-    {nombre:"SALA DE COMPRESORAS",x:72.5,y:72.4},
-    {nombre:"SALA DE COMPRESORAS (AMPLIACION)",x:79.0,y:72.4},
-    {nombre:"COCHERA Y DEPOSITO",x:84.3,y:70.7},
-    {nombre:"EDIFICIO GERENCIA DE OPERACIONES",x:36.9,y:65.7},
-    {nombre:"MAESTRANZA",x:28.8,y:60.2},
-    {nombre:"ACOPIO RESIDUOS HIDROCARBUROS",x:47.0,y:74.4},
-    {nombre:"GARITA CONTROL",x:59.8,y:71.8},
-    {nombre:"STORE",x:63.4,y:71.5},
-    {nombre:"TUNEL FAJA 242FT2",x:78.9,y:19.7},
-    {nombre:"TOLVA ALIM. DE CLINKER I (NORTE)",x:82.5,y:25.0}
+    {nombre:"PREHOMOGENEIZACION DE CEMENTO",x:16.25,y:18.5,rect:[5.5, 7.0, 27.0, 30.0]},
+    {nombre:"PREHOMOGENEIZACION DE CARBON",x:16.25,y:49.5,rect:[5.5, 37.0, 27.0, 62.0]},
+    {nombre:"DESCARGA DE CAMIONES",x:4.15,y:38.0,rect:[0.5, 33.5, 7.8, 42.5]},
+    {nombre:"CASETA DE GAS CARBONICO",x:29.5,y:39.0,rect:[26.0, 36.0, 33.0, 42.0]},
+    {nombre:"ED. DE TRANSP. Y CRIBADO",x:34.5,y:20.25,rect:[31.0, 17.0, 38.0, 23.5]},
+    {nombre:"FILTROS DE MANGAS LINEA II",x:38.25,y:27.35,rect:[34.0, 24.0, 42.5, 30.7]},
+    {nombre:"FILTROS DE MANGAS LINEA I",x:38.25,y:33.95,rect:[34.0, 30.7, 42.5, 37.2]},
+    {nombre:"FILTRO DE MANGAS",x:37.9,y:39.15,rect:[35.0, 37.0, 40.8, 41.3]},
+    {nombre:"HORNOS IDCAR",x:40.4,y:42.35,rect:[37.8, 40.0, 43.0, 44.7]},
+    {nombre:"ED. MOLINOS IDCAR",x:33.25,y:45.9,rect:[30.0, 42.0, 36.5, 49.8]},
+    {nombre:"GSA 1",x:33.0,y:42.15,rect:[31.0, 39.8, 35.0, 44.5]},
+    {nombre:"ED. ALIMENT.",x:36.85,y:43.75,rect:[34.7, 41.0, 39.0, 46.5]},
+    {nombre:"ED. DE COMP.",x:36.85,y:48.25,rect:[34.7, 45.8, 39.0, 50.7]},
+    {nombre:"TANQ. DIARIO IDCAR",x:37.75,y:51.75,rect:[35.0, 49.5, 40.5, 54.0]},
+    {nombre:"SILOS DE CARBON",x:44.4,y:37.9,rect:[41.0, 35.5, 47.8, 40.3]},
+    {nombre:"SILOS DE CRUDOS",x:44.0,y:42.5,rect:[40.0, 39.0, 48.0, 46.0]},
+    {nombre:"SILOS DE HOMOGENEIZACION",x:44.5,y:49.4,rect:[39.5, 46.0, 49.5, 52.8]},
+    {nombre:"PRECALENT. 2",x:45.75,y:30.4,rect:[42.0, 26.0, 49.5, 34.8]},
+    {nombre:"S.E. GSA 2 Y SALA DE COMPRESORES",x:50.25,y:25.25,rect:[47.0, 22.0, 53.5, 28.5]},
+    {nombre:"CASETA EQUIPO ANALIZADOR EN LINEA",x:49.5,y:19.75,rect:[46.5, 17.0, 52.5, 22.5]},
+    {nombre:"CHANCADORA DE CALIZA",x:54.0,y:21.0,rect:[51.0, 18.0, 57.0, 24.0]},
+    {nombre:"SUB ESTACION ZONA HORNO II",x:53.85,y:26.75,rect:[50.5, 23.7, 57.2, 29.8]},
+    {nombre:"PRECALENTADOR",x:50.15,y:43.1,rect:[47.0, 39.0, 53.3, 47.2]},
+    {nombre:"EDIFICIO INTERCAMBIO",x:55.5,y:40.5,rect:[52.5, 37.2, 58.5, 43.8]},
+    {nombre:"DUCTO DE GASES TERCIARIOS",x:61.15,y:39.75,rect:[56.5, 37.0, 65.8, 42.5]},
+    {nombre:"HORNO",x:58.75,y:36.0,rect:[55.5, 33.0, 62.0, 39.0]},
+    {nombre:"TANQ. DIARIO DE PETRO.",x:64.0,y:42.0,rect:[61.0, 39.0, 67.0, 45.0]},
+    {nombre:"CONTROL LAB.",x:66.5,y:45.9,rect:[63.5, 43.0, 69.5, 48.8]},
+    {nombre:"ENFRIADOR I",x:72.0,y:42.0,rect:[68.0, 38.0, 76.0, 46.0]},
+    {nombre:"ENFRIADOR II",x:70.0,y:31.25,rect:[66.0, 27.5, 74.0, 35.0]},
+    {nombre:"ELECTROFILTRO DE ENFRIADOR I",x:78.0,y:34.75,rect:[74.0, 31.0, 82.0, 38.5]},
+    {nombre:"ELECTROFILTRO DE ENFRIADOR II",x:77.25,y:25.25,rect:[73.0, 21.5, 81.5, 29.0]},
+    {nombre:"MAESTRANZA",x:29.25,y:59.65,rect:[25.5, 55.5, 33.0, 63.8]},
+    {nombre:"TALLER TEMPORAL",x:27.9,y:65.75,rect:[24.0, 63.0, 31.8, 68.5]},
+    {nombre:"INSPECTORIA",x:33.0,y:64.9,rect:[29.5, 62.0, 36.5, 67.8]},
+    {nombre:"EDIFICIO GERENCIA DE OPERACIONES",x:38.0,y:64.25,rect:[31.0, 58.0, 45.0, 70.5]},
+    {nombre:"PRENSA DE CRUDOS N° 4",x:48.0,y:59.0,rect:[45.0, 54.5, 51.0, 63.5]},
+    {nombre:"PRENSA DE CRUDOS N° 3",x:53.5,y:59.0,rect:[50.5, 54.5, 56.5, 63.5]},
+    {nombre:"PRENSA DE CRUDOS N° 2",x:59.1,y:59.0,rect:[56.0, 54.5, 62.2, 63.5]},
+    {nombre:"PRENSA DE CRUDOS N° 1",x:64.6,y:59.0,rect:[61.5, 54.5, 67.7, 63.5]},
+    {nombre:"MOLINOS DE BOLAS",x:62.0,y:53.0,rect:[58.0, 49.0, 66.0, 57.0]},
+    {nombre:"PRENSA DE CLINKER N° 1 Y 2",x:77.75,y:56.25,rect:[73.0, 51.5, 82.5, 61.0]},
+    {nombre:"SUB-EST. ELECT.",x:68.6,y:66.25,rect:[65.5, 63.0, 71.7, 69.5]},
+    {nombre:"SALA DE COMPRESORAS",x:71.75,y:71.75,rect:[68.0, 68.0, 75.5, 75.5]},
+    {nombre:"SALA DE COMPRESORAS (AMPLIACION)",x:78.75,y:71.75,rect:[75.0, 68.0, 82.5, 75.5]},
+    {nombre:"COCHERA Y DEPOSITO",x:84.5,y:70.0,rect:[81.0, 66.5, 88.0, 73.5]},
+    {nombre:"ACOPIO RESIDUOS HIDROCARBUROS",x:47.0,y:73.25,rect:[43.0, 70.0, 51.0, 76.5]},
+    {nombre:"GARITA CONTROL",x:59.25,y:71.5,rect:[56.0, 68.5, 62.5, 74.5]},
+    {nombre:"STORE",x:63.75,y:71.25,rect:[61.0, 68.0, 66.5, 74.5]},
+    {nombre:"TUNEL FAJA 242FT2",x:80.5,y:19.0,rect:[76.0, 15.5, 85.0, 22.5]},
+    {nombre:"TOLVA ALIM. DE CLINKER I (NORTE)",x:83.0,y:25.0,rect:[79.0, 21.0, 87.0, 29.0]}
   ]
 };
 
@@ -186,6 +192,8 @@ function makeZoomable(id){
     stage.style.setProperty("--sector-font", Math.min(11,6.5+(z-1)*2.2)+"px");
     stage.style.setProperty("--sector-label-width", Math.min(120,60+(z-1)*34)+"px");
     controls.querySelector(".zoom-value").textContent=Math.round(z*100)+"%";
+    stage.classList.toggle("zoom-detail",z>=1.5);
+    stage.classList.toggle("zoom-deep",z>=2.5);
   };
   controls.addEventListener("click",ev=>{
     ev.stopPropagation();
@@ -231,6 +239,22 @@ function drawChart(id,data,type){
   charts[id]=new Chart(ctx,{type,data:{labels,datasets:[{data:vals,borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:type==="doughnut",position:"right"}},scales:type==="doughnut"?{}:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
 
+
+function pointInRect(x,y,rect){
+  return Array.isArray(rect) && rect.length===4 && x>=rect[0] && x<=rect[2] && y>=rect[1] && y<=rect[3];
+}
+function findZoneAt(x,y){
+  // V3: selección estricta por zona. Ya NO se usa "el punto más cercano".
+  const matches=DATA.lugares.filter(l=>pointInRect(x,y,l.rect));
+  if(!matches.length) return null;
+  // Si existiera superposición, gana la zona de menor área (más específica).
+  matches.sort((a,b)=>{
+    const aa=(a.rect[2]-a.rect[0])*(a.rect[3]-a.rect[1]);
+    const bb=(b.rect[2]-b.rect[0])*(b.rect[3]-b.rect[1]);
+    return aa-bb;
+  });
+  return matches[0];
+}
 function setMarkerByLugar(nombre){
   const l=DATA.lugares.find(x=>x.nombre===nombre); if(!l)return;
   qs("mapX").value=l.x; qs("mapY").value=l.y;
@@ -255,14 +279,20 @@ function mapRegistroClick(e){
   const x=((e.clientX-box.left)/box.width)*100;
   const y=((e.clientY-box.top)/box.height)*100;
   if(x<0||x>100||y<0||y>100) return;
-  const nearest=DATA.lugares.map(l=>({...l,d:Math.hypot(l.x-x,l.y-y)})).sort((a,b)=>a.d-b.d)[0];
-  if(nearest){
-    qs("mapX").value=x.toFixed(3); qs("mapY").value=y.toFixed(3);
-    qs("lugar").value=nearest.nombre;
-    positionMarker(qs("registroMarker"),x,y,nearest.nombre);
-    qs("mapCoordText").textContent=`Lugar identificado en el plano: ${nearest.nombre}`;
-    toast(`Lugar seleccionado: ${nearest.nombre}`);
+
+  const zone=findZoneAt(x,y);
+  if(!zone){
+    toast("No se identificó un lugar en ese punto. Acerca más el plano y toca sobre el nombre del área.");
+    return;
   }
+
+  // Las coordenadas son internas: no se muestran al usuario.
+  qs("mapX").value=x.toFixed(3);
+  qs("mapY").value=y.toFixed(3);
+  qs("lugar").value=zone.nombre;
+  positionMarker(qs("registroMarker"),x,y,zone.nombre);
+  qs("mapCoordText").textContent=`Lugar identificado en el plano: ${zone.nombre}`;
+  toast(`Lugar seleccionado: ${zone.nombre}`);
 }
 
 function addQuickConexa(data={}){
@@ -382,7 +412,7 @@ function renderMapGeneral(){
   qs("sectorMarkers").innerHTML=DATA.lugares.map(l=>{
     const n=(by[l.nombre]||[]).length;
     const bg=n>=5?"rgba(228,61,48,.62)":n>=3?"rgba(242,138,26,.62)":n>=1?"rgba(243,198,35,.68)":"rgba(56,169,71,.52)";
-    return `<button class="sector-marker" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
+    return `<button class="sector-marker ${n===0?"zero-sector":"active-sector"}" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
       <span class="sector-count" style="background:${bg}">${n}</span>
       <span class="sector-name">${escapeHtml(l.nombre)}</span>
     </button>`;
@@ -444,7 +474,13 @@ async function postRemote(payload){
 async function loadRemote(){
   try{
     qs("syncStatus").textContent="Sincronizando...";
-    const res=await jsonp("bootstrap");if(res?.ok){DATA=res.data.config||DATA;registros=res.data.registros?.length?res.data.registros:registros;conexas=res.data.conexas?.length?res.data.conexas:conexas;persist();refreshAll();qs("syncStatus").textContent="Sincronizado";qs("syncStatus").className="pill ok"}
+    const res=await jsonp("bootstrap");if(res?.ok){DATA=res.data.config||DATA;
+      // Completa la geometría V3 con el catálogo local; X/Y del Sheet siguen siendo internos.
+      DATA.lugares=(DATA.lugares||[]).map(l=>{
+        const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
+        return local?{...local,...l,rect:local.rect}:l;
+      });
+      registros=res.data.registros?.length?res.data.registros:registros;conexas=res.data.conexas?.length?res.data.conexas:conexas;persist();refreshAll();qs("syncStatus").textContent="Sincronizado";qs("syncStatus").className="pill ok"}
   }catch(e){qs("syncStatus").textContent="Sin conexión · modo local";qs("syncStatus").className="pill warn"}
 }
 async function sendPdfRemote(base64,r,connectedCompanies=[],title="REGISTRO DE TRABAJO DE ALTO RIESGO"){
