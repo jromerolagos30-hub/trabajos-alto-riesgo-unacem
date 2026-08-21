@@ -27,3 +27,23 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
   #mapRegistro .map-marker:after{font-size:7px}
   .sector-count{border-width:1px}
 }
+
+/* V4 - Sectorización administrable */
+.protected-tab::after{content:"";margin-left:4px}
+.sector-gate{max-width:520px;margin:40px auto;text-align:center;padding:30px}
+.gate-icon{font-size:42px;margin-bottom:8px}
+.sector-gate h1{margin:8px 0}.sector-gate p{color:var(--muted)}
+.gate-form{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin:22px 0 12px;text-align:left}
+.sector-config-layout{grid-template-columns:minmax(330px,.55fr) minmax(620px,1.45fr)}
+.sector-step{background:#f7f9fb;border:1px solid #e2e7eb;border-radius:9px;padding:10px;margin:10px 0}
+.sector-step strong{display:block}.sector-step p{font-size:12px;color:#5d6873;margin:5px 0 0}
+.actions.left{justify-content:flex-start}
+.warn-box{background:#fff8e8;border-color:#f1d68c}
+.small-search{width:260px;margin:0}
+.sector-zone{position:absolute;border:2px solid rgba(24,119,213,.65);background:rgba(24,119,213,.12);z-index:5;cursor:pointer}
+.sector-zone span{position:absolute;left:2px;top:2px;background:rgba(255,255,255,.9);border:1px solid #d9e0e6;border-radius:3px;padding:2px 4px;font-size:7px;font-weight:800;line-height:1.05;max-width:120px}
+.sector-zone:hover{background:rgba(24,119,213,.20)}
+.sector-draft-zone{position:absolute;border:2px dashed #e1261c;background:rgba(225,38,28,.14);z-index:11;pointer-events:none}
+.sector-config-map.marking{cursor:crosshair}
+@media(max-width:1100px){.sector-config-layout{grid-template-columns:1fr}}
+@media(max-width:700px){.gate-form{grid-template-columns:1fr}.small-search{width:100%}}

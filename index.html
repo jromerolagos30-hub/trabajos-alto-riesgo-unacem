@@ -33,6 +33,7 @@
   <button class="tab" data-view="conexas">Coordinación Conexa</button>
   <button class="tab" data-view="mapa">Mapa Interactivo</button>
   <button class="tab" data-view="lista">Lista y Dashboard</button>
+  <button class="tab protected-tab" data-view="sectorizacion">Sectorización</button>
 </nav>
 
 <main>
@@ -386,6 +387,110 @@
       </article>
     </div>
   </section>
+
+  <!-- SECTORIZACIÓN -->
+  <section id="view-sectorizacion" class="view">
+    <div id="sectorGate" class="sector-gate card">
+      <div class="gate-icon">🔐</div>
+      <h1>Sectorización del plano</h1>
+      <p>Esta interfaz permite definir y corregir los sectores que utilizará la aplicación.</p>
+      <div class="gate-form">
+        <label>Clave de acceso
+          <input id="sectorPassword" type="password" autocomplete="off" placeholder="Ingrese la clave">
+        </label>
+        <button class="btn primary" id="btnSectorLogin">Ingresar</button>
+      </div>
+      <small>Acceso reservado para administración de la sectorización.</small>
+    </div>
+
+    <div id="sectorAdmin" class="hidden">
+      <div class="page-head">
+        <div>
+          <h1>Sectorización</h1>
+          <p>Acerca el plano, define la zona exacta del sector y asigna el título que debe utilizar la app.</p>
+        </div>
+        <button class="btn secondary" id="btnSectorLogout">Cerrar sectorización</button>
+      </div>
+
+      <div class="grid sector-config-layout">
+        <article class="card form-card">
+          <div class="card-head">
+            <div>
+              <h2>Configurar sector</h2>
+              <small>La zona se define con dos clics: esquina superior izquierda y esquina inferior derecha.</small>
+            </div>
+          </div>
+
+          <input type="hidden" id="sectorEditId">
+
+          <label>Título del sector*
+            <input id="sectorTitulo" placeholder="Ej.: CASETA DE GAS CARBONICO">
+          </label>
+
+          <div class="sector-step">
+            <strong>1. Acerca el plano</strong>
+            <p>Utiliza + / − y desplázate hasta ubicar claramente el rótulo del plano.</p>
+          </div>
+
+          <div class="sector-step">
+            <strong>2. Define la zona</strong>
+            <p id="sectorStepText">Haz clic en <b>Marcar zona</b> y luego selecciona dos puntos en el plano.</p>
+          </div>
+
+          <div class="actions left">
+            <button type="button" class="btn secondary" id="btnStartZone">Marcar zona</button>
+            <button type="button" class="btn secondary" id="btnClearZone">Limpiar zona</button>
+          </div>
+
+          <div id="sectorSelectionSummary" class="info-box">
+            <strong>Zona:</strong> aún no definida.
+          </div>
+
+          <div class="actions">
+            <button type="button" class="btn secondary" id="btnCancelSectorEdit">Cancelar edición</button>
+            <button type="button" class="btn primary" id="btnSaveSector">Guardar sector</button>
+          </div>
+
+          <div class="info-box warn-box">
+            <strong>Importante</strong>
+            <p>Las coordenadas se almacenan internamente para que la app reconozca el área, pero no se muestran a los usuarios durante el registro.</p>
+          </div>
+        </article>
+
+        <article class="card map-card">
+          <div class="card-head">
+            <div>
+              <h2>Plano para sectorización</h2>
+              <small>Los sectores ya configurados se muestran con borde semitransparente.</small>
+            </div>
+          </div>
+          <div id="mapSectorizacion" class="plant-map interactive sector-config-map">
+            <img src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+            <div id="sectorZoneLayer"></div>
+            <div id="sectorDraftZone" class="sector-draft-zone hidden"></div>
+          </div>
+          <div class="map-help">Consejo: marque únicamente el área ocupada por la instalación o rótulo. Evite superponer zonas.</div>
+        </article>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h2>Sectores configurados</h2>
+            <small>Puede editar, visualizar o eliminar cualquier sector.</small>
+          </div>
+          <input id="sectorSearch" class="small-search" placeholder="Buscar sector">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Sector</th><th>Actualizado</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaSectoresConfig"></tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
 </main>
 
 <!-- Modal conexión -->

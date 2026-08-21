@@ -74,6 +74,10 @@ let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || s
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
 let charts = {};
 let selectedSector = null;
+let sectorAdminUnlocked = sessionStorage.getItem("tar_sector_admin")==="1";
+let sectorMarking = false;
+let sectorDraftPoints = [];
+let userSectors = [];
 
 function today(){
   const d=new Date(); const off=d.getTimezoneOffset(); return new Date(d.getTime()-off*60000).toISOString().slice(0,10);
@@ -93,7 +97,7 @@ function isActive(r){return (r.EstadoOperativo||"ACTIVO")!=="FINALIZADO"}
 function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
   qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
-  wireNavigation(); setupZoomableMaps(); wireEvents(); renderConfig(); refreshAll();
+  wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion(); renderConfig(); refreshAll();
   if(CONFIG.apiUrl) loadRemote();
 }
 
@@ -108,6 +112,7 @@ function showView(name){
   if(name==="mapa") renderMapGeneral();
   if(name==="lista") renderListaDashboard();
   if(name==="conexas") updateConRegistroOptions();
+  if(name==="sectorizacion") renderSectorizacionAccess();
 }
 
 function wireEvents(){
@@ -169,7 +174,7 @@ function setMulti(id,values=[]){[...qs(id).querySelectorAll("input")].forEach(x=
 
 
 function setupZoomableMaps(){
-  ["mapRegistro","mapConexa","mapGeneral"].forEach(id=>makeZoomable(id));
+  ["mapRegistro","mapConexa","mapGeneral","mapSectorizacion"].forEach(id=>makeZoomable(id));
 }
 function makeZoomable(id){
   const map=qs(id); if(!map || map.dataset.zoomReady==="1") return;
@@ -244,10 +249,10 @@ function pointInRect(x,y,rect){
   return Array.isArray(rect) && rect.length===4 && x>=rect[0] && x<=rect[2] && y>=rect[1] && y<=rect[3];
 }
 function findZoneAt(x,y){
-  // V3: selección estricta por zona. Ya NO se usa "el punto más cercano".
-  const matches=DATA.lugares.filter(l=>pointInRect(x,y,l.rect));
+  // V4: usa prioritariamente la sectorización configurada por el administrador.
+  const source=(userSectors && userSectors.length)?userSectors:DATA.lugares;
+  const matches=source.filter(l=>pointInRect(x,y,l.rect));
   if(!matches.length) return null;
-  // Si existiera superposición, gana la zona de menor área (más específica).
   matches.sort((a,b)=>{
     const aa=(a.rect[2]-a.rect[0])*(a.rect[3]-a.rect[1]);
     const bb=(b.rect[2]-b.rect[0])*(b.rect[3]-b.rect[1]);
@@ -478,13 +483,168 @@ async function loadRemote(){
       // Completa la geometría V3 con el catálogo local; X/Y del Sheet siguen siendo internos.
       DATA.lugares=(DATA.lugares||[]).map(l=>{
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
-        return local?{...local,...l,rect:local.rect}:l;
+        return local?{...local,...l,rect:local?.rect}:l;
       });
+      userSectors=(res.data.sectores||[]).map(s=>({
+        id:s.id||s.ID||"",
+        nombre:s.nombre||s.Nombre||s.Sector||"",
+        x:Number(s.x||s.X||0),
+        y:Number(s.y||s.Y||0),
+        rect:Array.isArray(s.rect)?s.rect:[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
+        actualizado:s.actualizado||s.Actualizado||""
+      })).filter(s=>s.nombre && s.rect.every(Number.isFinite));
+      if(userSectors.length){
+        DATA.lugares=userSectors.map(s=>({nombre:s.nombre,x:s.x,y:s.y,rect:s.rect}));
+      }
       registros=res.data.registros?.length?res.data.registros:registros;conexas=res.data.conexas?.length?res.data.conexas:conexas;persist();refreshAll();qs("syncStatus").textContent="Sincronizado";qs("syncStatus").className="pill ok"}
   }catch(e){qs("syncStatus").textContent="Sin conexión · modo local";qs("syncStatus").className="pill warn"}
 }
 async function sendPdfRemote(base64,r,connectedCompanies=[],title="REGISTRO DE TRABAJO DE ALTO RIESGO"){
   return postRemote({action:"sendPdf",pdfBase64:base64,filename:`${r.ID}.pdf`,empresa:r.Empresa,connectedCompanies,title,registroId:r.ID})
+}
+
+
+function setupSectorizacion(){
+  const map=qs("mapSectorizacion");
+  if(!map) return;
+  qs("btnSectorLogin").onclick=sectorLogin;
+  qs("sectorPassword").addEventListener("keydown",e=>{if(e.key==="Enter")sectorLogin()});
+  qs("btnSectorLogout").onclick=()=>{
+    sectorAdminUnlocked=false;sessionStorage.removeItem("tar_sector_admin");renderSectorizacionAccess()
+  };
+  qs("btnStartZone").onclick=()=>{
+    sectorMarking=true;sectorDraftPoints=[];qs("sectorDraftZone").classList.add("hidden");
+    map.classList.add("marking");qs("sectorStepText").innerHTML="Haz clic en la <b>esquina superior izquierda</b> de la zona.";
+    toast("Marca el primer punto de la zona");
+  };
+  qs("btnClearZone").onclick=clearSectorDraft;
+  qs("btnCancelSectorEdit").onclick=resetSectorEditor;
+  qs("btnSaveSector").onclick=saveSectorConfig;
+  qs("sectorSearch").oninput=renderSectorConfigTable;
+  map.addEventListener("click",sectorMapClick);
+}
+function renderSectorizacionAccess(){
+  qs("sectorGate").classList.toggle("hidden",sectorAdminUnlocked);
+  qs("sectorAdmin").classList.toggle("hidden",!sectorAdminUnlocked);
+  if(sectorAdminUnlocked){
+    renderSectorZones();
+    renderSectorConfigTable();
+  }
+}
+async function sectorLogin(){
+  const pwd=qs("sectorPassword").value;
+  if(pwd!=="2026Unacem"){toast("Clave incorrecta");return}
+  sectorAdminUnlocked=true;
+  sessionStorage.setItem("tar_sector_admin","1");
+  qs("sectorPassword").value="";
+  renderSectorizacionAccess();
+  toast("Acceso a sectorización habilitado");
+}
+function sectorMapClick(e){
+  if(!sectorAdminUnlocked || !sectorMarking || e.target.closest(".map-zoom-controls")) return;
+  const stage=e.currentTarget.querySelector(".map-stage");
+  if(!stage)return;
+  const box=stage.getBoundingClientRect();
+  const x=((e.clientX-box.left)/box.width)*100;
+  const y=((e.clientY-box.top)/box.height)*100;
+  if(x<0||x>100||y<0||y>100)return;
+  sectorDraftPoints.push([x,y]);
+  if(sectorDraftPoints.length===1){
+    qs("sectorStepText").innerHTML="Primer punto registrado. Ahora haz clic en la <b>esquina inferior derecha</b>.";
+    toast("Primer punto guardado");
+  }else{
+    sectorMarking=false; e.currentTarget.classList.remove("marking");
+    normalizeSectorDraft();
+    qs("sectorStepText").textContent="Zona definida. Verifique el título y guarde el sector.";
+    toast("Zona definida");
+  }
+}
+function normalizeSectorDraft(){
+  if(sectorDraftPoints.length<2)return;
+  const a=sectorDraftPoints[0],b=sectorDraftPoints[1];
+  const rect=[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])];
+  sectorDraftPoints=[ [rect[0],rect[1]],[rect[2],rect[3]] ];
+  const d=qs("sectorDraftZone");
+  d.style.left=rect[0]+"%";d.style.top=rect[1]+"%";d.style.width=(rect[2]-rect[0])+"%";d.style.height=(rect[3]-rect[1])+"%";
+  d.classList.remove("hidden");
+  qs("sectorSelectionSummary").innerHTML=`<strong>Zona:</strong> definida correctamente para guardar.`;
+}
+function clearSectorDraft(){
+  sectorDraftPoints=[];sectorMarking=false;
+  qs("sectorDraftZone").classList.add("hidden");qs("mapSectorizacion")?.classList.remove("marking");
+  qs("sectorSelectionSummary").innerHTML="<strong>Zona:</strong> aún no definida.";
+  qs("sectorStepText").innerHTML='Haz clic en <b>Marcar zona</b> y luego selecciona dos puntos en el plano.';
+}
+function resetSectorEditor(){
+  qs("sectorEditId").value="";qs("sectorTitulo").value="";clearSectorDraft()
+}
+async function saveSectorConfig(){
+  if(!sectorAdminUnlocked)return;
+  const nombre=qs("sectorTitulo").value.trim().toUpperCase();
+  if(!nombre){toast("Ingrese el título del sector");return}
+  if(sectorDraftPoints.length<2){toast("Primero defina la zona en el plano");return}
+  const rect=[sectorDraftPoints[0][0],sectorDraftPoints[0][1],sectorDraftPoints[1][0],sectorDraftPoints[1][1]];
+  const sector={
+    id:qs("sectorEditId").value||uid("S"),
+    nombre,
+    x:Number(((rect[0]+rect[2])/2).toFixed(3)),
+    y:Number(((rect[1]+rect[3])/2).toFixed(3)),
+    rect:rect.map(v=>Number(v.toFixed(3))),
+    actualizado:new Date().toLocaleString()
+  };
+
+  const idx=userSectors.findIndex(s=>s.id===sector.id);
+  if(idx>=0)userSectors[idx]=sector;else userSectors.push(sector);
+
+  if(CONFIG.apiUrl){
+    const ok=await postRemote({action:"saveSector",password:"2026Unacem",sector});
+    if(!ok){toast("Sector guardado localmente; revise conexión con Apps Script")}
+  }
+  DATA.lugares=userSectors.map(s=>({nombre:s.nombre,x:s.x,y:s.y,rect:s.rect}));
+  populateAllSelects();renderSectorZones();renderSectorConfigTable();renderMapGeneral();resetSectorEditor();
+  toast("Sector guardado");
+}
+function renderSectorZones(){
+  const layer=qs("sectorZoneLayer");if(!layer)return;
+  const source=(userSectors&&userSectors.length)?userSectors:DATA.lugares.filter(s=>Array.isArray(s.rect));
+  layer.innerHTML=source.map(s=>{
+    const r=s.rect;const w=r[2]-r[0],h=r[3]-r[1];
+    return `<div class="sector-zone" style="left:${r[0]}%;top:${r[1]}%;width:${w}%;height:${h}%" title="${escapeHtml(s.nombre)}" onclick="event.stopPropagation();focusSectorConfig('${String(s.id||"").replaceAll("'","\\'")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')"><span>${escapeHtml(s.nombre)}</span></div>`
+  }).join("");
+}
+function renderSectorConfigTable(){
+  const q=(qs("sectorSearch")?.value||"").toLowerCase();
+  const source=(userSectors&&userSectors.length)?userSectors:DATA.lugares.filter(s=>Array.isArray(s.rect));
+  const rows=source.filter(s=>!q||s.nombre.toLowerCase().includes(q));
+  qs("tablaSectoresConfig").innerHTML=rows.map(s=>`<tr><td>${escapeHtml(s.nombre)}</td><td>${escapeHtml(s.actualizado||"")}</td>
+  <td><button class="btn mini secondary" onclick="editSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Editar</button>
+  <button class="btn mini secondary" onclick="focusSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Ver</button>
+  <button class="btn mini secondary" onclick="deleteSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Eliminar</button></td></tr>`).join("")||'<tr><td colspan="3">Sin sectores configurados.</td></tr>';
+}
+window.focusSectorConfig=function(id,nombre){
+  const s=(userSectors.length?userSectors:DATA.lugares).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
+  const map=qs("mapSectorizacion");const stage=map.querySelector(".map-stage");
+  if(map._zoom<2){map._zoom=2;stage.style.width="200%";map.querySelector(".zoom-value").textContent="200%"}
+  setTimeout(()=>{
+    const left=(s.x/100)*stage.scrollWidth-map.clientWidth/2;
+    const top=(s.y/100)*stage.scrollHeight-map.clientHeight/2;
+    map.scrollTo({left:Math.max(0,left),top:Math.max(0,top),behavior:"smooth"});
+  },50);
+}
+window.editSectorConfig=function(id,nombre){
+  const s=(userSectors.length?userSectors:DATA.lugares).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
+  qs("sectorEditId").value=s.id||"";qs("sectorTitulo").value=s.nombre;
+  sectorDraftPoints=[[s.rect[0],s.rect[1]],[s.rect[2],s.rect[3]]];normalizeSectorDraft();focusSectorConfig(id,nombre);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+window.deleteSectorConfig=async function(id,nombre){
+  if(!confirm(`¿Eliminar el sector "${nombre}"?`))return;
+  const s=(userSectors.length?userSectors:DATA.lugares).find(x=>(id&&x.id===id)||x.nombre===nombre);
+  if(!s)return;
+  userSectors=userSectors.filter(x=>x!==s);
+  if(CONFIG.apiUrl)await postRemote({action:"deleteSector",password:"2026Unacem",id:s.id,nombre:s.nombre});
+  DATA.lugares=userSectors.map(x=>({nombre:x.nombre,x:x.x,y:x.y,rect:x.rect}));
+  populateAllSelects();renderSectorZones();renderSectorConfigTable();renderMapGeneral();toast("Sector eliminado");
 }
 
 document.addEventListener("DOMContentLoaded",init);
