@@ -4,24 +4,62 @@ const DEFAULT_DATA = {
   riesgos:["Proyección de partículas incandescentes","Caída de objetos","Caída de carga","Contacto eléctrico"],
   areas:["DPA","DPRA","DIA"],
   lugares:[
-    {nombre:"GSA 1 Carbón",x:52,y:48},{nombre:"Molinos 1er Nivel",x:65,y:63},{nombre:"PK1 Piso 5",x:60,y:38},
-    {nombre:"Precalentador 2",x:56,y:34},{nombre:"Silos de Crudo",x:62,y:44},{nombre:"Silos de Carbón",x:68,y:34},
-    {nombre:"Filtros de Mangas Línea 1",x:46,y:28},{nombre:"Filtros de Mangas Línea 2",x:46,y:22},
-    {nombre:"Edificio Molienda de Crudo",x:45,y:45},{nombre:"Prensas de Crudos",x:69,y:66},
-    {nombre:"Molinos de Bola",x:83,y:56},{nombre:"Prensa de Clinker N°1 y 2",x:92,y:55},
-    {nombre:"Sala de Compresores",x:87,y:74},{nombre:"Prehomogeneización de Carbón",x:20,y:56},
-    {nombre:"Prehomogeneización de Cemento",x:20,y:23},{nombre:"Sub Estación 2",x:80,y:34}
+    {nombre:"PREHOMOGENEIZACION DE CEMENTO",x:16.0,y:18.4},
+    {nombre:"PREHOMOGENEIZACION DE CARBON",x:15.5,y:50.0},
+    {nombre:"ED. DE TRANSP. Y CRIBADO",x:34.8,y:21.2},
+    {nombre:"FILTROS DE MANGAS LINEA II",x:38.5,y:28.2},
+    {nombre:"FILTROS DE MANGAS LINEA I",x:38.8,y:34.3},
+    {nombre:"PRECALENT. 2",x:44.6,y:30.3},
+    {nombre:"S.E. GSA 2 Y SALA DE COMPRESORAS",x:48.4,y:25.7},
+    {nombre:"CASETA EQUIPO ANALIZADOR EN LINEA",x:48.0,y:20.6},
+    {nombre:"CHANCADORA DE CALIZA",x:52.8,y:21.4},
+    {nombre:"SUB ESTACION ZONA HORNO II",x:52.3,y:27.0},
+    {nombre:"FILTRO DE MANGAS",x:39.1,y:39.1},
+    {nombre:"HORNOS IDCAR",x:41.5,y:42.0},
+    {nombre:"GSA 1",x:33.6,y:43.4},
+    {nombre:"ED. ALIMENT.",x:36.4,y:43.4},
+    {nombre:"ED. DE COMP.",x:36.6,y:48.0},
+    {nombre:"SILOS DE CRUDOS",x:43.0,y:41.7},
+    {nombre:"SILOS DE CARBON",x:45.2,y:37.6},
+    {nombre:"SILOS DE HOMOGENEIZACION",x:44.6,y:49.2},
+    {nombre:"PRECALENTADOR",x:49.3,y:43.2},
+    {nombre:"EDIFICIO INTERCAMBIO",x:55.0,y:40.7},
+    {nombre:"DUCTO DE GASES TERCIARIOS",x:59.3,y:40.6},
+    {nombre:"HORNO",x:58.1,y:36.6},
+    {nombre:"TANQ. DIARIO DE PETRO.",x:63.4,y:42.0},
+    {nombre:"CONTROL LAB.",x:66.1,y:46.2},
+    {nombre:"ENFRIADOR I",x:72.1,y:42.3},
+    {nombre:"ENFRIADOR II",x:69.6,y:31.3},
+    {nombre:"ELECTROFILTRO DE ENFRIADOR I",x:78.4,y:34.7},
+    {nombre:"ELECTROFILTRO DE ENFRIADOR II",x:77.4,y:25.2},
+    {nombre:"MOLINOS DE BOLAS",x:61.1,y:54.2},
+    {nombre:"PRENSA DE CRUDOS N° 4",x:48.2,y:60.0},
+    {nombre:"PRENSA DE CRUDOS N° 3",x:53.7,y:60.0},
+    {nombre:"PRENSA DE CRUDOS N° 2",x:59.0,y:60.0},
+    {nombre:"PRENSA DE CRUDOS N° 1",x:64.5,y:60.0},
+    {nombre:"PRENSA DE CLINKER N° 1 Y 2",x:76.8,y:58.0},
+    {nombre:"SUB-EST. ELECT.",x:68.7,y:67.4},
+    {nombre:"SALA DE COMPRESORAS",x:72.5,y:72.4},
+    {nombre:"SALA DE COMPRESORAS (AMPLIACION)",x:79.0,y:72.4},
+    {nombre:"COCHERA Y DEPOSITO",x:84.3,y:70.7},
+    {nombre:"EDIFICIO GERENCIA DE OPERACIONES",x:36.9,y:65.7},
+    {nombre:"MAESTRANZA",x:28.8,y:60.2},
+    {nombre:"ACOPIO RESIDUOS HIDROCARBUROS",x:47.0,y:74.4},
+    {nombre:"GARITA CONTROL",x:59.8,y:71.8},
+    {nombre:"STORE",x:63.4,y:71.5},
+    {nombre:"TUNEL FAJA 242FT2",x:78.9,y:19.7},
+    {nombre:"TOLVA ALIM. DE CLINKER I (NORTE)",x:82.5,y:25.0}
   ]
 };
 
 const DEMO_REGISTROS = [
-  {ID:"R-1001",Empresa:"FGA INGENIEROS S.A.",AreaUsuaria:"DPA",TrabajoCritico:["Trabajos en altura","Izaje de Cargas"],Lugar:"GSA 1 Carbón",Fecha:today(),HoraInicio:"08:00",HoraTermino:"17:00",NTrabajadores:8,Descripcion:"Montaje de estructura metálica",RiesgosCriticos:["Caída de objetos","Caída de carga"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:52,Y:48},
-  {ID:"R-1002",Empresa:"CORMEI",AreaUsuaria:"DIA",TrabajoCritico:["Trabajos en caliente"],Lugar:"GSA 1 Carbón",Fecha:today(),HoraInicio:"09:00",HoraTermino:"15:00",NTrabajadores:5,Descripcion:"Soldadura de soportes",RiesgosCriticos:["Proyección de partículas incandescentes"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:52,Y:48},
-  {ID:"R-1003",Empresa:"AGEIN",AreaUsuaria:"DPA",TrabajoCritico:["Aislamiento de Energía"],Lugar:"Molinos 1er Nivel",Fecha:today(),HoraInicio:"07:30",HoraTermino:"12:30",NTrabajadores:4,Descripcion:"Aislamiento para intervención",RiesgosCriticos:["Contacto eléctrico"],Conexas:"NO",EstadoOperativo:"ACTIVO",X:65,Y:63},
-  {ID:"R-1004",Empresa:"HAUG",AreaUsuaria:"DPRA",TrabajoCritico:["Izaje de Cargas"],Lugar:"Precalentador 2",Fecha:today(),HoraInicio:"10:00",HoraTermino:"18:00",NTrabajadores:7,Descripcion:"Izaje de componentes",RiesgosCriticos:["Caída de carga","Caída de objetos"],Conexas:"NO",EstadoOperativo:"ACTIVO",X:56,Y:34}
+  {ID:"R-1001",Empresa:"FGA INGENIEROS S.A.",AreaUsuaria:"DPA",TrabajoCritico:["Trabajos en altura","Izaje de Cargas"],Lugar:"GSA 1",Fecha:today(),HoraInicio:"08:00",HoraTermino:"17:00",NTrabajadores:8,Descripcion:"Montaje de estructura metálica",RiesgosCriticos:["Caída de objetos","Caída de carga"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:33.6,Y:43.4},
+  {ID:"R-1002",Empresa:"CORMEI",AreaUsuaria:"DIA",TrabajoCritico:["Trabajos en caliente"],Lugar:"GSA 1",Fecha:today(),HoraInicio:"09:00",HoraTermino:"15:00",NTrabajadores:5,Descripcion:"Soldadura de soportes",RiesgosCriticos:["Proyección de partículas incandescentes"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:33.6,Y:43.4},
+  {ID:"R-1003",Empresa:"AGEIN",AreaUsuaria:"DPA",TrabajoCritico:["Aislamiento de Energía"],Lugar:"MOLINOS DE BOLAS",Fecha:today(),HoraInicio:"07:30",HoraTermino:"12:30",NTrabajadores:4,Descripcion:"Aislamiento para intervención",RiesgosCriticos:["Contacto eléctrico"],Conexas:"NO",EstadoOperativo:"ACTIVO",X:61.1,Y:54.2},
+  {ID:"R-1004",Empresa:"HAUG",AreaUsuaria:"DPRA",TrabajoCritico:["Izaje de Cargas"],Lugar:"PRECALENT. 2",Fecha:today(),HoraInicio:"10:00",HoraTermino:"18:00",NTrabajadores:7,Descripcion:"Izaje de componentes",RiesgosCriticos:["Caída de carga","Caída de objetos"],Conexas:"NO",EstadoOperativo:"ACTIVO",X:44.6,Y:30.3}
 ];
 const DEMO_CONEXAS = [
-  {ID:"C-2001",RegistroID:"R-1001",Fecha:today(),HoraGestion:"09:20",MiEmpresa:"FGA INGENIEROS S.A.",Lugar:"GSA 1 Carbón",JefePropio:"Responsable FGA",SsomaPropio:"SSOMA FGA",EmpresasConexas:[{empresa:"CORMEI",actividad:"Soldadura de soportes",riesgos:["Proyección de partículas incandescentes"],controles:"Delimitación, pantallas ignífugas y coordinación de secuencia.",jefe:"Jefe CORMEI",ssoma:"SSOMA CORMEI"}],Observaciones:"Mantener comunicación permanente.",Actualizado:new Date().toLocaleString()}
+  {ID:"C-2001",RegistroID:"R-1001",Fecha:today(),HoraGestion:"09:20",MiEmpresa:"FGA INGENIEROS S.A.",Lugar:"GSA 1",JefePropio:"Responsable FGA",SsomaPropio:"SSOMA FGA",EmpresasConexas:[{empresa:"CORMEI",actividad:"Soldadura de soportes",riesgos:["Proyección de partículas incandescentes"],controles:"Delimitación, pantallas ignífugas y coordinación de secuencia.",jefe:"Jefe CORMEI",ssoma:"SSOMA CORMEI"}],Observaciones:"Mantener comunicación permanente.",Actualizado:new Date().toLocaleString()}
 ];
 
 let CONFIG = { apiUrl: localStorage.getItem("tar_api_url") || "" };
@@ -49,7 +87,7 @@ function isActive(r){return (r.EstadoOperativo||"ACTIVO")!=="FINALIZADO"}
 function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
   qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
-  wireNavigation(); wireEvents(); renderConfig(); refreshAll();
+  wireNavigation(); setupZoomableMaps(); wireEvents(); renderConfig(); refreshAll();
   if(CONFIG.apiUrl) loadRemote();
 }
 
@@ -80,7 +118,7 @@ function wireEvents(){
   qs("btnGuardarBorrador").onclick=saveDraft;
   qs("lugar").onchange=()=>setMarkerByLugar(qs("lugar").value);
   qs("mapRegistro").onclick=mapRegistroClick;
-  qs("btnElegirMapa").onclick=()=>{qs("mapRegistro").scrollIntoView({behavior:"smooth",block:"center"});toast("Haga clic en el sector del plano")};
+  qs("btnElegirMapa").onclick=()=>{qs("mapRegistro").scrollIntoView({behavior:"smooth",block:"center"});toast("Acerca el plano y haz clic exactamente sobre el nombre del lugar")};
   qs("btnResetMarker").onclick=clearMarker;
   qs("filtroMisEmpresa").onchange=renderMisRegistros; qs("filtroMisFecha").onchange=renderMisRegistros;
   qs("btnBuscarAnterior").onclick=openContinue; qs("closeContinue").onclick=()=>qs("continueModal").classList.add("hidden");
@@ -123,6 +161,48 @@ function populateAllSelects(){
 function selectedMulti(id){return [...qs(id).querySelectorAll("input:checked")].map(x=>x.value)}
 function setMulti(id,values=[]){[...qs(id).querySelectorAll("input")].forEach(x=>x.checked=values.includes(x.value))}
 
+
+function setupZoomableMaps(){
+  ["mapRegistro","mapConexa","mapGeneral"].forEach(id=>makeZoomable(id));
+}
+function makeZoomable(id){
+  const map=qs(id); if(!map || map.dataset.zoomReady==="1") return;
+  map.dataset.zoomReady="1"; map.classList.add("zoomable");
+  const stage=document.createElement("div"); stage.className="map-stage";
+  while(map.firstChild) stage.appendChild(map.firstChild);
+  map.appendChild(stage);
+  const controls=document.createElement("div"); controls.className="map-zoom-controls";
+  controls.innerHTML=`<button type="button" data-z="in" aria-label="Acercar">+</button>
+    <button type="button" data-z="out" aria-label="Alejar">−</button>
+    <button type="button" data-z="reset" aria-label="Restablecer">⛶</button>
+    <div class="zoom-value">100%</div>`;
+  map.insertBefore(controls,stage);
+  map._zoom=1;
+  const apply=()=>{
+    const z=map._zoom;
+    stage.style.width=(z*100)+"%";
+    stage.style.setProperty("--map-label-size", Math.min(12,6.2+(z-1)*3.0)+"px");
+    stage.style.setProperty("--sector-size", Math.min(25,15+(z-1)*5)+"px");
+    stage.style.setProperty("--sector-font", Math.min(11,6.5+(z-1)*2.2)+"px");
+    stage.style.setProperty("--sector-label-width", Math.min(120,60+(z-1)*34)+"px");
+    controls.querySelector(".zoom-value").textContent=Math.round(z*100)+"%";
+  };
+  controls.addEventListener("click",ev=>{
+    ev.stopPropagation();
+    const a=ev.target.dataset.z; if(!a)return;
+    if(a==="in") map._zoom=Math.min(3.5,map._zoom+0.5);
+    if(a==="out") map._zoom=Math.max(1,map._zoom-0.5);
+    if(a==="reset"){map._zoom=1;map.scrollTo({left:0,top:0,behavior:"smooth"})}
+    apply();
+  });
+  map.addEventListener("dblclick",ev=>{
+    if(ev.target.closest(".map-zoom-controls"))return;
+    ev.preventDefault();
+    map._zoom=map._zoom<2?2:1; apply();
+  });
+  apply();
+}
+
 function refreshAll(){
   populateAllSelects(); renderResumen(); renderMisRegistros(); renderConexasTable(); renderMapGeneral(); renderListaDashboard(); updateConRegistroOptions();
 }
@@ -153,15 +233,36 @@ function drawChart(id,data,type){
 
 function setMarkerByLugar(nombre){
   const l=DATA.lugares.find(x=>x.nombre===nombre); if(!l)return;
-  qs("mapX").value=l.x;qs("mapY").value=l.y;positionMarker(qs("registroMarker"),l.x,l.y);qs("mapCoordText").textContent=`${nombre} – ubicación vinculada al plano`;
+  qs("mapX").value=l.x; qs("mapY").value=l.y;
+  positionMarker(qs("registroMarker"),l.x,l.y,nombre);
+  qs("mapCoordText").textContent=`Lugar identificado en el plano: ${nombre}`;
 }
-function positionMarker(el,x,y){el.style.left=x+"%";el.style.top=y+"%";el.classList.remove("hidden")}
-function clearMarker(){qs("mapX").value="";qs("mapY").value="";qs("registroMarker").classList.add("hidden");qs("mapCoordText").textContent="Sin ubicación seleccionada"}
+function positionMarker(el,x,y,label=""){
+  el.style.left=x+"%"; el.style.top=y+"%";
+  el.dataset.label=label||"";
+  el.classList.remove("hidden");
+}
+function clearMarker(){
+  qs("mapX").value=""; qs("mapY").value="";
+  qs("registroMarker").classList.add("hidden");
+  qs("mapCoordText").textContent="Lugar identificado en el plano: —";
+}
 function mapRegistroClick(e){
-  const box=e.currentTarget.getBoundingClientRect(); const x=((e.clientX-box.left)/box.width)*100, y=((e.clientY-box.top)/box.height)*100;
-  qs("mapX").value=x.toFixed(2);qs("mapY").value=y.toFixed(2);positionMarker(qs("registroMarker"),x,y);
+  if(e.target.closest(".map-zoom-controls")) return;
+  const stage=e.currentTarget.querySelector(".map-stage");
+  if(!stage) return;
+  const box=stage.getBoundingClientRect();
+  const x=((e.clientX-box.left)/box.width)*100;
+  const y=((e.clientY-box.top)/box.height)*100;
+  if(x<0||x>100||y<0||y>100) return;
   const nearest=DATA.lugares.map(l=>({...l,d:Math.hypot(l.x-x,l.y-y)})).sort((a,b)=>a.d-b.d)[0];
-  if(nearest){qs("lugar").value=nearest.nombre;qs("mapCoordText").textContent=`Sector aproximado: ${nearest.nombre}`}
+  if(nearest){
+    qs("mapX").value=x.toFixed(3); qs("mapY").value=y.toFixed(3);
+    qs("lugar").value=nearest.nombre;
+    positionMarker(qs("registroMarker"),x,y,nearest.nombre);
+    qs("mapCoordText").textContent=`Lugar identificado en el plano: ${nearest.nombre}`;
+    toast(`Lugar seleccionado: ${nearest.nombre}`);
+  }
 }
 
 function addQuickConexa(data={}){
@@ -211,7 +312,7 @@ function renderMisRegistros(){
   <td><button class="btn mini secondary" onclick="editRegistro('${r.ID}')">Editar</button><button class="btn mini secondary" onclick="openConexaFor('${r.ID}')">Conexa</button>${isActive(r)?`<button class="btn mini secondary" onclick="finalizarRegistro('${r.ID}')">Finalizar</button>`:"<b>Finalizado</b>"}<button class="btn mini secondary" onclick="continuarRegistro('${r.ID}')">Continuar mañana</button></td></tr>`).join("")||`<tr><td colspan="7">Sin registros.</td></tr>`
 }
 window.editRegistro=function(id){
-  const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;qs("tieneConexas").value=r.Conexas||"NO";setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y);qs("mapCoordText").textContent=r.Lugar;window.scrollTo({top:0,behavior:"smooth"})
+  const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;qs("tieneConexas").value=r.Conexas||"NO";setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;window.scrollTo({top:0,behavior:"smooth"})
 }
 window.finalizarRegistro=async function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;
@@ -220,7 +321,7 @@ window.finalizarRegistro=async function(id){
 }
 window.continuarRegistro=function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;const d=new Date(r.Fecha+"T12:00:00");d.setDate(d.getDate()+1);const next=d.toISOString().slice(0,10);
-  showView("registro");qs("registroId").value="";qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=next;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;qs("tieneConexas").value=r.Conexas||"NO";setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y);qs("mapCoordText").textContent=r.Lugar;toast("Actividad copiada. Revise y actualice antes de registrar.")
+  showView("registro");qs("registroId").value="";qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=next;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;qs("tieneConexas").value=r.Conexas||"NO";setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;toast("Actividad copiada. Revise y actualice antes de registrar.")
 }
 function openContinue(){qs("continueModal").classList.remove("hidden");renderContinueTable()}
 function renderContinueTable(){
@@ -237,7 +338,7 @@ function updateConRegistroOptions(){
 function renderConexaOwnRecord(){
   const r=registros.find(x=>x.ID===qs("conRegistroPropio").value);const marker=qs("conexaMarker");
   if(!r){marker.classList.add("hidden");return}
-  positionMarker(marker,r.X,r.Y)
+  positionMarker(marker,r.X,r.Y,r.Lugar)
 }
 function addConexaCompany(data={}){
   const el=document.createElement("div");el.className="conexa-item";
@@ -278,13 +379,20 @@ function filteredForMap(){
 }
 function renderMapGeneral(){
   const rs=filteredForMap(),by={};rs.forEach(r=>(by[r.Lugar]??=[]).push(r));
-  qs("sectorMarkers").innerHTML=DATA.lugares.map(l=>{const n=(by[l.nombre]||[]).length;let c=n>=5?"#e43d30":n>=3?"#f28a1a":n>=1?"#f3c623":"#38a947";return `<button class="sector-dot" style="left:${l.x}%;top:${l.y}%;background:${c}" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">${n}</button>`}).join("");
+  qs("sectorMarkers").innerHTML=DATA.lugares.map(l=>{
+    const n=(by[l.nombre]||[]).length;
+    const bg=n>=5?"rgba(228,61,48,.62)":n>=3?"rgba(242,138,26,.62)":n>=1?"rgba(243,198,35,.68)":"rgba(56,169,71,.52)";
+    return `<button class="sector-marker" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
+      <span class="sector-count" style="background:${bg}">${n}</span>
+      <span class="sector-name">${escapeHtml(l.nombre)}</span>
+    </button>`;
+  }).join("");
   if(selectedSector) selectSector(selectedSector,false)
 }
 window.selectSector=function(nombre,scroll=true){
   selectedSector=nombre;const rs=filteredForMap().filter(r=>r.Lugar===nombre);qs("sectorEmpty").classList.add("hidden");qs("sectorDetail").classList.remove("hidden");qs("sectorNombre").textContent=nombre;qs("sectorTrabajos").textContent=rs.length;qs("sectorTrabajadores").textContent=rs.reduce((s,r)=>s+Number(r.NTrabajadores),0);qs("sectorEmpresas").textContent=new Set(rs.map(r=>r.Empresa)).size;qs("sectorConexos").textContent=conexas.filter(c=>c.Fecha===(qs("mapFiltroFecha").value||today())&&c.Lugar===nombre).reduce((s,c)=>s+c.EmpresasConexas.length,0);
   const b=qs("sectorBadge");b.textContent=rs.length+" trabajos";b.className="load-badge "+loadClass(rs.length);qs("sectorActividades").innerHTML=rs.map(r=>`<div><b>${escapeHtml(r.Empresa)}</b><br>${arr(r.TrabajoCritico).join(", ")} · ${r.NTrabajadores} trab.</div>`).join("")||"<small>Sin actividades para el filtro.</small>";
-  [...document.querySelectorAll(".sector-dot")].forEach(x=>x.classList.toggle("selected",x.title.startsWith(nombre+" ·")));if(scroll)qs("sectorDetail").scrollIntoView({behavior:"smooth",block:"nearest"})
+  [...document.querySelectorAll(".sector-marker")].forEach(x=>x.classList.toggle("selected",x.title.startsWith(nombre+" ·")));if(scroll)qs("sectorDetail").scrollIntoView({behavior:"smooth",block:"nearest"})
 }
 
 function listFilters(){
