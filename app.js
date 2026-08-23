@@ -580,13 +580,79 @@ async function buildPdfRegistro(r){
 }
 async function buildPdfConexa(c,r){
   const mapDetail=await makeMapDetailImage(r);
-  qs("pdfTitle").textContent="COORDINACIÓN DE TRABAJOS DE ALTO RIESGO EN ÁREAS ALEDAÑAS O CONEXAS";qs("pdfSubtitle").textContent=`ID ${c.ID} · ${c.Fecha} · ${c.HoraGestion} · Versión ${c.Version||1}`;
-  qs("pdfContent").innerHTML=`<div class="pdf-content-grid">${pdfField("Mi empresa",c.MiEmpresa)}${pdfField("Lugar",c.Lugar)}${pdfField("Actividad propia",r.Descripcion)}${pdfField("Trabajo crítico propio",arr(r.TrabajoCritico).join(", "))}${pdfField("Riesgos críticos propios",arr(r.RiesgosCriticos).join(", "))}${pdfField("Jefe del área propio",c.JefePropio)}${pdfField("Supervisor SSOMA propio",c.SsomaPropio)}${pdfField("Hora de gestión",c.HoraGestion)}</div>
-  <h3 class="pdf-section-title">Empresas / actividades conexas</h3>${c.EmpresasConexas.map(x=>`<div class="pdf-conexa"><b>${x.empresa}</b><br><b>Actividad:</b> ${x.actividad}<br><b>Riesgos que mi actividad genera:</b> ${x.riesgos.join(", ")}<br><b>Controles específicos:</b> ${x.controles}<br><b>Jefe notificado:</b> ${x.jefe}<br><b>SSOMA notificado:</b> ${x.ssoma}</div>`).join("")}
-  <div class="pdf-conexa"><b>Observaciones / acuerdos:</b><br>${c.Observaciones||"—"}</div>
-  <h3 class="pdf-section-title">Evidencia de la reunión</h3><div class="pdf-photo"><img src="${c.FotoReunion}" alt="Foto reunión"></div>
-  <h3 class="pdf-section-title">Detalle de ubicación en el plano</h3><div class="pdf-map-detail"><img src="${mapDetail}" alt="Detalle del plano"></div>`;
-  return renderPdfAndDownload(`${c.ID}_Coordinacion_Conexa_V${c.Version||1}.pdf`)
+
+  qs("pdfTitle").textContent="COORDINACIÓN DE ACTIVIDAD CONEXA";
+  qs("pdfSubtitle").textContent=`ID ${c.ID} · ${c.Fecha} · ${c.HoraGestion} · Versión ${c.Version||1}`;
+
+  qs("pdfContent").innerHTML=`
+    <div class="pdf-conexa-two-pages">
+
+      <section class="pdf-conexa-page pdf-conexa-map-page" data-pdf-page="1">
+        <div class="pdf-page-number">Página 1 de 2</div>
+        <div class="pdf-header">
+          <img class="pdf-logo-img" src="logo_unacem.jpg" alt="UNACEM">
+          <div>
+            <h2>COORDINACIÓN DE ACTIVIDAD CONEXA</h2>
+            <p>MAPA DE UBICACIÓN</p>
+          </div>
+        </div>
+
+        <div class="pdf-content-grid">
+          ${pdfField("Mi empresa",c.MiEmpresa)}
+          ${pdfField("Lugar / Sector",c.Lugar)}
+          ${pdfField("Fecha",c.Fecha)}
+          ${pdfField("Hora de gestión",c.HoraGestion)}
+        </div>
+
+        <div class="pdf-map-detail">
+          <img src="${mapDetail}" alt="Detalle de ubicación en el plano">
+        </div>
+      </section>
+
+      <section class="pdf-conexa-page pdf-conexa-form-page" data-pdf-page="2">
+        <div class="pdf-page-number">Página 2 de 2</div>
+        <div class="pdf-header">
+          <img class="pdf-logo-img" src="logo_unacem.jpg" alt="UNACEM">
+          <div>
+            <h2>COORDINACIÓN DE ACTIVIDAD CONEXA</h2>
+            <p>REGISTRO</p>
+          </div>
+        </div>
+
+        <div class="pdf-content-grid">
+          ${pdfField("Mi empresa",c.MiEmpresa)}
+          ${pdfField("Lugar",c.Lugar)}
+          ${pdfField("Actividad propia",r.Descripcion)}
+          ${pdfField("Trabajo crítico propio",arr(r.TrabajoCritico).join(", "))}
+          ${pdfField("Riesgos críticos propios",arr(r.RiesgosCriticos).join(", "))}
+          ${pdfField("Jefe del área propio",c.JefePropio)}
+          ${pdfField("Supervisor SSOMA propio",c.SsomaPropio)}
+          ${pdfField("Hora de gestión",c.HoraGestion)}
+        </div>
+
+        <h3 class="pdf-section-title">Empresas / actividades conexas</h3>
+        ${c.EmpresasConexas.map(x=>`
+          <div class="pdf-conexa">
+            <b>${x.empresa}</b><br>
+            <b>Actividad:</b> ${x.actividad}<br>
+            <b>Riesgos que mi actividad genera:</b> ${x.riesgos.join(", ")}<br>
+            <b>Controles específicos:</b> ${x.controles}<br>
+            <b>Jefe notificado:</b> ${x.jefe}<br>
+            <b>SSOMA notificado:</b> ${x.ssoma}
+          </div>`).join("")}
+
+        <div class="pdf-conexa">
+          <b>Observaciones / acuerdos:</b><br>${c.Observaciones||"—"}
+        </div>
+
+        <h3 class="pdf-section-title">Evidencia de la reunión</h3>
+        <div class="pdf-photo">
+          <img src="${c.FotoReunion}" alt="Foto reunión">
+        </div>
+      </section>
+    </div>`;
+
+  return renderPdfConexaTwoPages(`${c.ID}_Coordinacion_Conexa_V${c.Version||1}.pdf`);
 }
 function pdfField(k,v){return `<div class="pdf-field"><strong>${escapeHtml(k)}</strong>${escapeHtml(String(v??""))}</div>`}
 async function renderPdfAndDownload(filename){
@@ -597,6 +663,39 @@ async function renderPdfAndDownload(filename){
   pdf.addImage(img,"JPEG",10,y,w,h,undefined,"FAST");remaining-=277;
   while(remaining>0){pdf.addPage();y=10-(h-remaining);pdf.addImage(img,"JPEG",10,y,w,h,undefined,"FAST");remaining-=277}
   pdf.save(filename);return pdf.output("datauristring").split(",")[1]
+}
+
+async function renderPdfConexaTwoPages(filename){
+  const root=qs("pdfSheet");
+  await waitForImages(root);
+
+  const pages=[...root.querySelectorAll(".pdf-conexa-page")];
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF("p","mm","a4");
+
+  for(let i=0;i<pages.length;i++){
+    const canvas=await html2canvas(pages[i],{
+      scale:2.6,
+      useCORS:true,
+      backgroundColor:"#ffffff",
+      imageTimeout:15000,
+      scrollX:0,
+      scrollY:0
+    });
+
+    const img=canvas.toDataURL("image/jpeg",0.98);
+    const pageW=210,pageH=297,margin=7;
+    const maxW=pageW-margin*2,maxH=pageH-margin*2;
+    const ratio=Math.min(maxW/canvas.width,maxH/canvas.height);
+    const w=canvas.width*ratio,h=canvas.height*ratio;
+    const x=(pageW-w)/2,y=(pageH-h)/2;
+
+    if(i>0)pdf.addPage();
+    pdf.addImage(img,"JPEG",x,y,w,h,undefined,"FAST");
+  }
+
+  pdf.save(filename);
+  return pdf.output("datauristring").split(",")[1];
 }
 
 function addHistoryLocal(tipo,id,accion,empresa){console.log("HISTORIAL",tipo,id,accion,empresa,new Date().toISOString())}

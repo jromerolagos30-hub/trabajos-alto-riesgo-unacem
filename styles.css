@@ -108,3 +108,67 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
   .sector-name{font-size:4.5px!important;max-width:42px!important}
   .sector-marker.selected .sector-name{font-size:9px!important;max-width:125px!important}
 }
+
+/* REV.02 – mapa móvil y selección */
+.sector-name,
+.sector-marker.selected .sector-name,
+.map-stage.zoom-detail .sector-name,
+.map-stage.zoom-deep .sector-name,
+.map-stage.zoom-detail .sector-marker.selected .sector-name,
+.map-stage.zoom-deep .sector-marker.selected .sector-name{
+  font-size:4.4px!important;
+  max-width:42px!important;
+  line-height:1!important;
+  padding:1px 2px!important;
+  white-space:normal!important;
+  background:rgba(255,255,255,.88)!important;
+  box-shadow:0 1px 2px rgba(0,0,0,.18)!important;
+}
+.sector-marker.selected{z-index:30}
+.sector-marker.selected .sector-count{
+  transform:none!important;
+  opacity:1!important;
+  filter:saturate(1.9) brightness(.88) contrast(1.18);
+  box-shadow:0 0 0 2px rgba(255,255,255,.95),0 0 0 4px rgba(20,26,31,.38),0 2px 7px rgba(0,0,0,.58)!important;
+}
+.sector-marker:not(.selected) .sector-count{opacity:.62}
+@media(max-width:700px){
+  .sector-name,
+  .sector-marker.selected .sector-name,
+  .map-stage.zoom-detail .sector-name,
+  .map-stage.zoom-deep .sector-name,
+  .map-stage.zoom-detail .sector-marker.selected .sector-name,
+  .map-stage.zoom-deep .sector-marker.selected .sector-name{
+    font-size:3.5px!important;
+    max-width:32px!important;
+    padding:1px!important;
+  }
+  .sector-count{
+    width:13px!important;
+    height:13px!important;
+    font-size:5.5px!important;
+  }
+}
+/* PDF Conexa – exactamente dos páginas */
+.pdf-conexa-two-pages{width:900px;background:#fff;color:#111}
+.pdf-conexa-page{
+  width:900px;
+  min-height:1272px;
+  padding:26px 30px;
+  background:#fff;
+  position:relative;
+}
+.pdf-conexa-map-page{display:flex;flex-direction:column}
+.pdf-conexa-map-page .pdf-map-detail{
+  flex:1;display:flex;align-items:center;justify-content:center;margin-top:14px
+}
+.pdf-conexa-map-page .pdf-map-detail img{
+  width:100%;height:auto;max-height:1080px;object-fit:contain
+}
+.pdf-conexa-form-page{display:flex;flex-direction:column}
+.pdf-conexa-form-page .pdf-content-grid{margin-top:10px}
+.pdf-conexa-form-page .pdf-photo{margin-top:8px}
+.pdf-conexa-form-page .pdf-photo img{max-height:310px}
+.pdf-page-number{
+  position:absolute;right:30px;top:24px;font-size:10px;color:#555;font-weight:700
+}
