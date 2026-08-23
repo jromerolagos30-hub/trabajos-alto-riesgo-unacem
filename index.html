@@ -17,7 +17,7 @@
   <div class="brand">
     <img class="brand-logo" src="logo_unacem.jpg" alt="UNACEM">
     <div class="brand-copy">
-      <small>Gestión diaria de trabajos de alto riesgo</small>
+      <strong class="brand-title">Gestión diaria de trabajos de alto riesgo y Reporte de Actividades Conexas</strong>
     </div>
   </div>
 </header>
@@ -130,32 +130,14 @@
           <label>Nº de trabajadores*
             <input id="nTrabajadores" type="number" min="1" value="1" required>
           </label>
-          <label>¿Se trabajará cerca a otras actividades conexas?*
-            <select id="tieneConexas" required>
-              <option value="NO">NO</option>
-              <option value="SI">SI</option>
-            </select>
-          </label>
         </div>
 
         <label>Descripción del trabajo*
           <textarea id="descripcion" rows="4" required placeholder="Describa la actividad a ejecutar"></textarea>
         </label>
-
-        <div id="conexasQuick" class="subcard hidden">
-          <div class="subcard-head">
-            <div>
-              <strong>Actividad conexa inicial</strong>
-              <small>Puede ampliarla posteriormente desde “Coordinación Conexa”.</small>
-            </div>
-            <button type="button" class="btn mini" id="btnAgregarConexaQuick">+ Agregar empresa conexa</button>
-          </div>
-          <div id="conexasQuickList"></div>
-        </div>
-
         <div class="actions">
           <button type="button" class="btn secondary" id="btnGuardarBorrador">Guardar borrador local</button>
-          <button type="submit" class="btn primary">Registrar y generar PDF</button>
+          <button type="submit" class="btn primary" id="btnSubmitRegistro">Registrar y generar PDF</button>
         </div>
       </form>
 
@@ -208,6 +190,7 @@
 
     <div class="grid conexa-layout">
       <form id="formConexa" class="card form-card">
+        <input type="hidden" id="conexaEditId">
         <div class="form-grid cols-3">
           <label>Mi empresa*
             <select id="conMiEmpresa" required></select>
@@ -223,6 +206,7 @@
         <label>Actividad propia reportada*
           <select id="conRegistroPropio" required></select>
         </label>
+        <div id="conActividadResumen" class="activity-own-summary hidden"></div>
 
         <div class="subcard">
           <strong>Responsables de mi empresa</strong>
@@ -246,8 +230,16 @@
           <textarea id="conObservaciones" rows="3" placeholder="Acuerdos de coordinación, secuencia, horarios, rutas, radios, delimitaciones, etc."></textarea>
         </label>
 
+        <div class="photo-field">
+          <label>Foto del registro de reunión*
+            <input id="conFotoReunion" type="file" accept="image/*" capture="environment" required>
+          </label>
+          <small>Adjunte una foto legible de la reunión/coordinación realizada.</small>
+          <div id="conFotoPreview" class="photo-preview hidden"></div>
+        </div>
+
         <div class="actions">
-          <button type="submit" class="btn primary">Guardar coordinación y enviar PDF</button>
+          <button type="submit" class="btn primary" id="btnSubmitConexa">Guardar coordinación y enviar PDF</button>
         </div>
       </form>
 
@@ -257,10 +249,6 @@
           <img src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div class="map-marker hidden" id="conexaMarker"><span></span></div>
         </div>
-        <div class="info-box">
-          <strong>Historial</strong>
-          <p>Cada inclusión, actualización o culminación se registra en la pestaña <b>Historial</b> de Google Sheets.</p>
-        </div>
       </article>
     </div>
 
@@ -268,7 +256,8 @@
       <div class="card-head">
         <h2>Coordinaciones conexas registradas</h2>
         <div class="inline-fields compact">
-          <label>Empresa <select id="filtroConEmpresa"></select></label>
+          <label>Mi empresa <select id="filtroConEmpresa"></select></label>
+          <label>Empresa involucrada <select id="filtroConEmpresaInvolucrada"></select></label>
           <label>Fecha <input id="filtroConFecha" type="date"></label>
         </div>
       </div>
@@ -511,7 +500,7 @@
 <!-- PDF render -->
 <div id="pdfSheet" class="pdf-sheet">
   <div class="pdf-header">
-    <div class="pdf-logo">UNACEM</div>
+    <img class="pdf-logo-img" src="logo_unacem.jpg" alt="UNACEM">
     <div><h2 id="pdfTitle">REGISTRO DE TRABAJO DE ALTO RIESGO</h2><p id="pdfSubtitle">Gestión diaria</p></div>
   </div>
   <div id="pdfContent"></div>
