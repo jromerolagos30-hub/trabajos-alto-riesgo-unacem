@@ -172,3 +172,68 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
 .pdf-page-number{
   position:absolute;right:30px;top:24px;font-size:10px;color:#555;font-weight:700
 }
+
+/* =========================
+   REV.03 – títulos responsive por dispositivo
+   ========================= */
+
+/* PC / laptop: títulos más grandes y legibles */
+@media(min-width:901px){
+  .sector-name,
+  .sector-marker.selected .sector-name,
+  .map-stage.zoom-detail .sector-name,
+  .map-stage.zoom-deep .sector-name,
+  .map-stage.zoom-detail .sector-marker.selected .sector-name,
+  .map-stage.zoom-deep .sector-marker.selected .sector-name{
+    font-size:7px!important;
+    max-width:76px!important;
+    line-height:1.05!important;
+    padding:2px 3px!important;
+    background:rgba(255,255,255,.90)!important;
+  }
+
+  .sector-count{
+    width:17px!important;
+    height:17px!important;
+    font-size:7px!important;
+  }
+
+  /* Seleccionado: el texto mantiene exactamente el mismo tamaño */
+  .sector-marker.selected .sector-name{
+    font-size:7px!important;
+    max-width:76px!important;
+  }
+}
+
+/* Tablet: tamaño intermedio */
+@media(min-width:701px) and (max-width:900px){
+  .sector-name,
+  .sector-marker.selected .sector-name,
+  .map-stage.zoom-detail .sector-name,
+  .map-stage.zoom-deep .sector-name,
+  .map-stage.zoom-detail .sector-marker.selected .sector-name,
+  .map-stage.zoom-deep .sector-marker.selected .sector-name{
+    font-size:5.4px!important;
+    max-width:54px!important;
+  }
+}
+
+/* Celular: conservar el tamaño compacto de REV.02 */
+@media(max-width:700px){
+  .sector-name,
+  .sector-marker.selected .sector-name,
+  .map-stage.zoom-detail .sector-name,
+  .map-stage.zoom-deep .sector-name,
+  .map-stage.zoom-detail .sector-marker.selected .sector-name,
+  .map-stage.zoom-deep .sector-marker.selected .sector-name{
+    font-size:3.5px!important;
+    max-width:32px!important;
+    padding:1px!important;
+  }
+
+  .sector-count{
+    width:13px!important;
+    height:13px!important;
+    font-size:5.5px!important;
+  }
+}
