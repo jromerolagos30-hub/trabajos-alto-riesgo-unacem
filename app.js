@@ -97,7 +97,7 @@ function uid(prefix){return prefix+"-"+Date.now().toString().slice(-7)}
 function toast(msg){const t=qs("toast");t.textContent=msg;t.classList.remove("hidden");setTimeout(()=>t.classList.add("hidden"),2600)}
 function persist(){
   localStorage.setItem("tar_registros",JSON.stringify(registros));
-  const safeConexas=conexas.map(c=>({...c,FotoReunion:""}));
+  const safeConexas=conexas.map(c=>({...c,FotoReunion:"",ArchivoReunion:""}));
   try{localStorage.setItem("tar_conexas",JSON.stringify(safeConexas))}catch(e){}
 }
 function isActive(r){return (r.EstadoOperativo||"ACTIVO")!=="FINALIZADO"}
@@ -454,10 +454,18 @@ async function fileToOptimizedDataURL(file,maxDim=1800,quality=.88){
   return c.toDataURL("image/jpeg",quality);
 }
 function loadImage(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=src})}
+async function waitForPdfJs(timeoutMs=7000){
+  const start=Date.now();
+  while(!window.pdfjsLib && Date.now()-start<timeoutMs){
+    await new Promise(r=>setTimeout(r,120));
+  }
+  if(!window.pdfjsLib)throw new Error("PDF.js no terminó de cargar");
+  return window.pdfjsLib;
+}
 async function pdfFirstPageToImage(file){
-  if(!window.pdfjsLib)throw new Error("PDF.js no disponible");
+  const pdfjs=await waitForPdfJs();
   const buffer=await file.arrayBuffer();
-  const pdf=await window.pdfjsLib.getDocument({data:buffer}).promise;
+  const pdf=await pdfjs.getDocument({data:buffer}).promise;
   const page=await pdf.getPage(1);
   const base=page.getViewport({scale:1});
   const scale=Math.max(1,1600/base.width);
@@ -648,6 +656,11 @@ function renderMeetingEvidenceForPdf(v){
 }
 async function buildPdfConexa(c,r){
   const mapDetail=await makeMapDetailImage(r);
+  const evidencia=c.ArchivoReunion||c.FotoReunion||"";
+  const evidenciaParseada=parseMeetingAttachment(evidencia);
+  if(!evidenciaParseada){
+    throw new Error("No se pudo preparar la evidencia adjunta para el PDF.");
+  }
 
   qs("pdfTitle").textContent="COORDINACIÓN DE ACTIVIDAD CONEXA";
   qs("pdfSubtitle").textContent=`ID ${c.ID} · ${c.Fecha} · ${c.HoraGestion} · Versión ${c.Version||1}`;
@@ -714,9 +727,7 @@ async function buildPdfConexa(c,r){
         </div>
 
         <h3 class="pdf-section-title">Evidencia / registro adjunto de la reunión</h3>
-        <div class="pdf-photo">
-          <img src="${c.FotoReunion}" alt="Foto reunión">
-        </div>
+        ${renderMeetingEvidenceForPdf(c.ArchivoReunion||c.FotoReunion||"")}
       </section>
     </div>`;
 
