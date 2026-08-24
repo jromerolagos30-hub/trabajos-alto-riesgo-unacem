@@ -438,6 +438,14 @@ function collectConexas(){
   }))
 }
 
+function fileToDataURL(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>res(fr.result);
+    fr.onerror=rej;
+    fr.readAsDataURL(file);
+  });
+}
 async function fileToOptimizedDataURL(file,maxDim=1800,quality=.88){
   const data=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file)});
   const img=await loadImage(data);let w=img.naturalWidth,h=img.naturalHeight;
@@ -447,13 +455,28 @@ async function fileToOptimizedDataURL(file,maxDim=1800,quality=.88){
 }
 function loadImage(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=src})}
 async function handleConexaPhoto(e){
-  const f=e.target.files?.[0];pendingConexaPhoto="";
-  if(!f){qs("conFotoPreview").classList.add("hidden");return}
+  const f=e.target.files?.[0];
+  pendingConexaPhoto="";
+  const preview=qs("conFotoPreview");
+  if(!f){preview.classList.add("hidden");preview.innerHTML="";return}
   try{
-    pendingConexaPhoto=await fileToOptimizedDataURL(f);
-    qs("conFotoPreview").innerHTML=`<img src="${pendingConexaPhoto}" alt="Foto de reunión">`;
-    qs("conFotoPreview").classList.remove("hidden");
-  }catch(err){toast("No se pudo procesar la foto");e.target.value=""}
+    if(f.type==="application/pdf" || f.name.toLowerCase().endsWith(".pdf")){
+      const data=await fileToDataURL(f);
+      pendingConexaPhoto=JSON.stringify({kind:"pdf",name:f.name,type:"application/pdf",data});
+      preview.innerHTML=`<div class="file-preview-card"><span class="file-icon">📄</span><span>${escapeHtml(f.name)}<br><small>PDF adjunto</small></span></div>`;
+      preview.classList.remove("hidden");
+    }else if(f.type.startsWith("image/")){
+      const data=await fileToOptimizedDataURL(f);
+      pendingConexaPhoto=JSON.stringify({kind:"image",name:f.name,type:"image/jpeg",data});
+      preview.innerHTML=`<img src="${data}" alt="Evidencia de reunión">`;
+      preview.classList.remove("hidden");
+    }else{
+      toast("Formato no permitido. Use imagen o PDF.");
+      e.target.value="";
+    }
+  }catch(err){
+    console.error(err);toast("No se pudo procesar el archivo");e.target.value="";
+  }
 }
 function conexaSignature(c){
   return JSON.stringify({
@@ -475,7 +498,7 @@ async function submitConexa(e){
   if(!pendingConexaPhoto)return toast("La foto del registro de reunión es obligatoria");
   const editId=qs("conexaEditId").value;
   const current=editId?conexas.find(x=>x.ID===editId):null;
-  const c={ID:editId||uid("C"),RegistroID:r.ID,Fecha:qs("conFecha").value,HoraGestion:qs("conHora").value,MiEmpresa:qs("conMiEmpresa").value,Lugar:r.Lugar,JefePropio:qs("conJefePropio").value,SsomaPropio:qs("conSsomaPropio").value,EmpresasConexas:empresas,Observaciones:qs("conObservaciones").value,Actualizado:new Date().toLocaleString(),Version:Number(current?.Version||0)+1,Estado:"ACTIVO",FotoReunion:pendingConexaPhoto};
+  const c={ID:editId||uid("C"),RegistroID:r.ID,Fecha:qs("conFecha").value,HoraGestion:qs("conHora").value,MiEmpresa:qs("conMiEmpresa").value,Lugar:r.Lugar,JefePropio:qs("conJefePropio").value,SsomaPropio:qs("conSsomaPropio").value,EmpresasConexas:empresas,Observaciones:qs("conObservaciones").value,Actualizado:new Date().toLocaleString(),Version:Number(current?.Version||0)+1,Estado:"ACTIVO",ArchivoReunion:pendingConexaPhoto};
   if(!editId && isDuplicateConexa(c)){
     alert("Esta coordinación ya fue registrada con los mismos detalles. Revise el registro existente antes de volver a enviarla.");
     return;
@@ -484,7 +507,7 @@ async function submitConexa(e){
   try{
     if(current){Object.assign(current,c)}else conexas.push(c);
     persist();addHistoryLocal("CONEXA",c.ID,current?"EDICIÓN":"ALTA",c.MiEmpresa);
-    if(CONFIG.apiUrl)await postRemote({action:"saveConexa",conexa:{...c,FotoReunion:pendingConexaPhoto}});
+    if(CONFIG.apiUrl)await postRemote({action:"saveConexa",conexa:{...c,ArchivoReunion:pendingConexaPhoto}});
     const pdf=await buildPdfConexa(c,r);
     if(CONFIG.apiUrl)await sendPdfRemote(pdf,{Empresa:c.MiEmpresa,ID:c.ID},empresas.map(x=>x.empresa),"COORDINACIÓN DE ACTIVIDADES CONEXAS");
     toast("Coordinación registrada y PDF generado");
@@ -518,7 +541,7 @@ function filteredForMap(){
 }
 function renderMapGeneral(){
   const rs=filteredForMap(),by={};rs.forEach(r=>(by[r.Lugar]??=[]).push(r));
-  qs("sectorMarkers").innerHTML=(userSectors||[]).map(l=>{
+  qs("sectorMarkers").innerHTML=(userSectors||[]).filter(l=>(by[l.nombre]||[]).length>0).map(l=>{
     const n=(by[l.nombre]||[]).length;
     const bg=n>=5?"rgba(228,61,48,.62)":n>=3?"rgba(242,138,26,.62)":n>=1?"rgba(243,198,35,.68)":"rgba(56,169,71,.52)";
     return `<button class="sector-marker ${n===0?"zero-sector":"active-sector"}" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
@@ -577,6 +600,19 @@ async function buildPdfRegistro(r){
   </div>
   <h3 class="pdf-section-title">Detalle de ubicación</h3><div class="pdf-map-detail"><img src="${mapDetail}" alt="Detalle del plano"></div>`;
   return renderPdfAndDownload(`${r.ID}_Trabajo_Alto_Riesgo.pdf`)
+}
+function parseMeetingAttachment(v){
+  if(!v)return null;
+  try{const o=JSON.parse(v);if(o&&o.kind)return o}catch(e){}
+  if(String(v).startsWith("data:image/"))return {kind:"image",data:v,name:"Evidencia"};
+  return null;
+}
+function renderMeetingEvidenceForPdf(v){
+  const a=parseMeetingAttachment(v);
+  if(!a)return `<div class="pdf-conexa">Sin evidencia adjunta.</div>`;
+  if(a.kind==="image")return `<div class="pdf-photo"><img src="${a.data}" alt="Evidencia reunión"></div>`;
+  if(a.kind==="pdf")return `<div class="pdf-conexa"><b>Archivo PDF adjunto:</b><br>${escapeHtml(a.name||"Documento de reunión")}</div>`;
+  return `<div class="pdf-conexa">Evidencia adjunta.</div>`;
 }
 async function buildPdfConexa(c,r){
   const mapDetail=await makeMapDetailImage(r);
