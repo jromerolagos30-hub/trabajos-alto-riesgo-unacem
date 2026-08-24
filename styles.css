@@ -242,3 +242,13 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
 .file-preview-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #dce2e7;border-radius:8px;background:#fff;font-size:12px;font-weight:700}
 .file-preview-card .file-icon{font-size:26px}
 .sector-marker.zero-sector{display:none!important}
+
+/* REV.05 – visualizar registro PDF adjunto en segunda hoja */
+.pdf-evidence-page{
+  margin-top:8px;border:1px solid #9fa7ae;border-radius:4px;background:#fff;
+  padding:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  min-height:410px;flex:1
+}
+.pdf-evidence-page img{display:block;max-width:100%;max-height:500px;width:auto;height:auto;object-fit:contain}
+.pdf-conexa-form-page .pdf-photo{flex:1;display:flex;align-items:center;justify-content:center;min-height:380px}
+.pdf-conexa-form-page .pdf-photo img{max-height:500px!important;max-width:100%;object-fit:contain}

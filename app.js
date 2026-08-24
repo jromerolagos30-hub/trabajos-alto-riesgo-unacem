@@ -454,6 +454,23 @@ async function fileToOptimizedDataURL(file,maxDim=1800,quality=.88){
   return c.toDataURL("image/jpeg",quality);
 }
 function loadImage(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=src})}
+async function pdfFirstPageToImage(file){
+  if(!window.pdfjsLib)throw new Error("PDF.js no disponible");
+  const buffer=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:buffer}).promise;
+  const page=await pdf.getPage(1);
+  const base=page.getViewport({scale:1});
+  const scale=Math.max(1,1600/base.width);
+  const viewport=page.getViewport({scale});
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.round(viewport.width);
+  canvas.height=Math.round(viewport.height);
+  const ctx=canvas.getContext("2d",{alpha:false});
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  await page.render({canvasContext:ctx,viewport}).promise;
+  return canvas.toDataURL("image/jpeg",0.9);
+}
+
 async function handleConexaPhoto(e){
   const f=e.target.files?.[0];
   pendingConexaPhoto="";
@@ -462,8 +479,16 @@ async function handleConexaPhoto(e){
   try{
     if(f.type==="application/pdf" || f.name.toLowerCase().endsWith(".pdf")){
       const data=await fileToDataURL(f);
-      pendingConexaPhoto=JSON.stringify({kind:"pdf",name:f.name,type:"application/pdf",data});
-      preview.innerHTML=`<div class="file-preview-card"><span class="file-icon">📄</span><span>${escapeHtml(f.name)}<br><small>PDF adjunto</small></span></div>`;
+      let previewImage="";
+      try{
+        previewImage=await pdfFirstPageToImage(f);
+      }catch(pdfErr){
+        console.warn("No se pudo renderizar la vista previa del PDF",pdfErr);
+      }
+      pendingConexaPhoto=JSON.stringify({kind:"pdf",name:f.name,type:"application/pdf",data,previewImage});
+      preview.innerHTML=previewImage
+        ? `<div class="file-preview-card"><span class="file-icon">📄</span><span>${escapeHtml(f.name)}<br><small>PDF adjunto · vista previa lista</small></span></div><div class="photo-preview"><img src="${previewImage}" alt="Vista previa PDF"></div>`
+        : `<div class="file-preview-card"><span class="file-icon">📄</span><span>${escapeHtml(f.name)}<br><small>PDF adjunto</small></span></div>`;
       preview.classList.remove("hidden");
     }else if(f.type.startsWith("image/")){
       const data=await fileToOptimizedDataURL(f);
@@ -610,8 +635,15 @@ function parseMeetingAttachment(v){
 function renderMeetingEvidenceForPdf(v){
   const a=parseMeetingAttachment(v);
   if(!a)return `<div class="pdf-conexa">Sin evidencia adjunta.</div>`;
-  if(a.kind==="image")return `<div class="pdf-photo"><img src="${a.data}" alt="Evidencia reunión"></div>`;
-  if(a.kind==="pdf")return `<div class="pdf-conexa"><b>Archivo PDF adjunto:</b><br>${escapeHtml(a.name||"Documento de reunión")}</div>`;
+  if(a.kind==="image"){
+    return `<div class="pdf-photo"><img src="${a.data}" alt="Evidencia reunión"></div>`;
+  }
+  if(a.kind==="pdf"){
+    if(a.previewImage){
+      return `<div class="pdf-evidence-page"><img src="${a.previewImage}" alt="Primera página del registro adjunto"></div>`;
+    }
+    return `<div class="pdf-conexa"><b>Archivo PDF adjunto:</b><br>${escapeHtml(a.name||"Documento de reunión")}<br><small>No fue posible generar la vista previa.</small></div>`;
+  }
   return `<div class="pdf-conexa">Evidencia adjunta.</div>`;
 }
 async function buildPdfConexa(c,r){
@@ -681,7 +713,7 @@ async function buildPdfConexa(c,r){
           <b>Observaciones / acuerdos:</b><br>${c.Observaciones||"—"}
         </div>
 
-        <h3 class="pdf-section-title">Evidencia de la reunión</h3>
+        <h3 class="pdf-section-title">Evidencia / registro adjunto de la reunión</h3>
         <div class="pdf-photo">
           <img src="${c.FotoReunion}" alt="Foto reunión">
         </div>
