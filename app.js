@@ -528,7 +528,8 @@ async function submitConexa(e){
   const r=registros.find(x=>x.ID===qs("conRegistroPropio").value);if(!r)return toast("Seleccione la actividad propia reportada");
   const empresas=collectConexas();if(!empresas.length)return toast("Agregue al menos una empresa conexa");
   if(empresas.some(x=>!x.riesgos.length))return toast("Cada empresa conexa debe tener al menos un riesgo crítico seleccionado");
-  if(!pendingConexaPhoto)return toast("La foto del registro de reunión es obligatoria");
+  if(!qs("conObservaciones").value.trim())return toast("Complete el campo Observaciones / acuerdos antes de guardar la coordinación");
+  if(!pendingConexaPhoto)return toast("La foto o archivo del registro de reunión es obligatorio");
   const editId=qs("conexaEditId").value;
   const current=editId?conexas.find(x=>x.ID===editId):null;
   const c={ID:editId||uid("C"),RegistroID:r.ID,Fecha:qs("conFecha").value,HoraGestion:qs("conHora").value,MiEmpresa:qs("conMiEmpresa").value,Lugar:r.Lugar,JefePropio:qs("conJefePropio").value,SsomaPropio:qs("conSsomaPropio").value,EmpresasConexas:empresas,Observaciones:qs("conObservaciones").value,Actualizado:new Date().toLocaleString(),Version:Number(current?.Version||0)+1,Estado:"ACTIVO",ArchivoReunion:pendingConexaPhoto};
