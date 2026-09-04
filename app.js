@@ -276,7 +276,8 @@ function makeZoomable(id){
     <button type="button" data-z="reset" aria-label="Restablecer">⛶</button>
     <div class="zoom-value">100%</div>`;
   map.insertBefore(controls,stage);
-  map._zoom=1;
+  const isMobileMap=()=>window.matchMedia("(max-width:700px)").matches;
+  map._zoom=isMobileMap()?3.5:1;
   const apply=()=>{
     const z=map._zoom;
     stage.style.width=(z*100)+"%";
@@ -292,14 +293,19 @@ function makeZoomable(id){
     ev.stopPropagation();
     const a=ev.target.dataset.z; if(!a)return;
     if(a==="in") map._zoom=Math.min(3.5,map._zoom+0.5);
-    if(a==="out") map._zoom=Math.max(1,map._zoom-0.5);
-    if(a==="reset"){map._zoom=1;map.scrollTo({left:0,top:0,behavior:"smooth"})}
+    if(a==="out") map._zoom=isMobileMap()?3.5:Math.max(1,map._zoom-0.5);
+    if(a==="reset"){
+      map._zoom=isMobileMap()?3.5:1;
+      map.scrollTo({left:0,top:0,behavior:"smooth"});
+    }
     apply();
   });
   map.addEventListener("dblclick",ev=>{
     if(ev.target.closest(".map-zoom-controls"))return;
     ev.preventDefault();
-    map._zoom=map._zoom<2?2:1; apply();
+    if(isMobileMap()){ map._zoom=3.5; }
+    else { map._zoom=map._zoom<2?2:1; }
+    apply();
   });
   apply();
 }
