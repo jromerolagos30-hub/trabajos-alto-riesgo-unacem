@@ -114,6 +114,15 @@ const EMERGENCY_CONTROLS = {
   ]
 };
 
+const EMERGENCY_OPTIONAL_CONTROLS = new Set([
+  "Trípode de acuerdo a evaluación",
+  "Sistema de polipastos de acuerdo a evaluación"
+]);
+function isOptionalEmergencyControl(control){
+  return EMERGENCY_OPTIONAL_CONTROLS.has(String(control||"").trim());
+}
+
+
 
 const DEMO_REGISTROS = [
   {ID:"R-1001",Empresa:"FGA INGENIEROS S.A.",AreaUsuaria:"DPA",TrabajoCritico:["Trabajos en altura","Izaje de Cargas"],Lugar:"GSA 1",Fecha:today(),HoraInicio:"08:00",HoraTermino:"17:00",NTrabajadores:8,Descripcion:"Montaje de estructura metálica",RiesgosCriticos:["Caída de objetos","Caída de carga"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:33.6,Y:43.4},
@@ -436,9 +445,10 @@ function renderEmergencyControls(){
       <div class="emergency-checks">
       ${controls.map(c=>{
         const key=work+"||"+c;
-        return `<label class="emergency-check"><input type="checkbox" class="emergency-control-check" value="${escapeHtml(key)}" ${current.has(key)?"checked":""}><span>${escapeHtml(c)}</span></label>`;
+        return `<label class="emergency-check ${isOptionalEmergencyControl(c)?"optional-control":""}"><input type="checkbox" class="emergency-control-check" value="${escapeHtml(key)}" ${current.has(key)?"checked":""}><span>${escapeHtml(c)}</span></label>`;
       }).join("")}
       </div>
+      ${work.toLowerCase().includes("confinado")?`<div class="emergency-note">El trípode y el sistema de polipastos son controles según evaluación y no afectan el porcentaje de cumplimiento.</div>`:""}
     </div>`;
   }).join("")||'<div class="empty-state-small">No hay controles configurados para esta selección.</div>';
 
@@ -461,7 +471,12 @@ function selectedEmergencyControls(){
 function hasEmergencySelectionForEachWork(){
   const selected=selectedMulti("trabajosCriticos");
   const chosen=selectedEmergencyControls();
-  return selected.every(work=>!emergencyControlsForWork(work).length || (chosen[work]&&chosen[work].length));
+  return selected.every(work=>{
+    const required=emergencyControlsForWork(work).filter(c=>!isOptionalEmergencyControl(c));
+    if(!required.length)return true;
+    const implemented=(chosen[work]||[]).filter(c=>!isOptionalEmergencyControl(c));
+    return implemented.length>0;
+  });
 }
 function setEmergencyControls(data){
   renderEmergencyControls();
@@ -476,9 +491,10 @@ function emergencyComplianceStatsFromSelection(){
   const chosen=selectedEmergencyControls();
   let required=0,implemented=0;
   works.forEach(w=>{
-    const req=emergencyControlsForWork(w);
+    const req=emergencyControlsForWork(w).filter(c=>!isOptionalEmergencyControl(c));
+    const imp=(chosen[w]||[]).filter(c=>!isOptionalEmergencyControl(c));
     required+=req.length;
-    implemented+=(chosen[w]||[]).length;
+    implemented+=imp.length;
   });
   const pct=required?Math.round((implemented/required)*100):0;
   return {required,implemented,pct};
@@ -488,9 +504,10 @@ function emergencyComplianceStatsFromRecord(r){
   const chosen=r.ControlesEmergencia||{};
   let required=0,implemented=0;
   works.forEach(w=>{
-    const req=emergencyControlsForWork(w);
+    const req=emergencyControlsForWork(w).filter(c=>!isOptionalEmergencyControl(c));
+    const imp=arr(chosen[w]).filter(c=>!isOptionalEmergencyControl(c));
     required+=req.length;
-    implemented+=(arr(chosen[w])).length;
+    implemented+=imp.length;
   });
   const pct=required?Math.round((implemented/required)*100):0;
   return {required,implemented,pct};
@@ -511,7 +528,7 @@ function complianceBadgeClass(pct){
 }
 function recordMatchesCompliance(r,range){
   if(!range)return true;
-  return complianceRange(r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct)===range;
+  return complianceRange(emergencyComplianceStatsFromRecord(r).pct)===range;
 }
 function globalEmergencyCompliance(rs){
   let required=0,implemented=0;
@@ -775,17 +792,40 @@ function filteredForMap(){
   const d=qs("mapFiltroFecha").value||today(),t=qs("mapFiltroTrabajo").value,e=qs("mapFiltroEmpresa").value,a=qs("mapFiltroArea").value;
   return registros.filter(r=>r.Fecha===d&&isActive(r)&&(!t||arr(r.TrabajoCritico).includes(t))&&(!e||r.Empresa===e)&&(!a||r.AreaUsuaria===a))
 }
+function normalizeSectorKey(v){
+  return String(v||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .trim().replace(/\s+/g," ").toUpperCase();
+}
 function renderMapGeneral(){
-  const rs=filteredForMap(),by={}.filter(r=>recordMatchesCompliance(r,qs("filtroMapaCumplimiento")?.value||""));rs.forEach(r=>(by[r.Lugar]??=[]).push(r));
-  qs("sectorMarkers").innerHTML=(userSectors||[]).filter(l=>(by[l.nombre]||[]).length>0).map(l=>{
-    const n=(by[l.nombre]||[]).length;
-    const bg=n>=5?"rgba(228,61,48,.62)":n>=3?"rgba(242,138,26,.62)":n>=1?"rgba(243,198,35,.68)":"rgba(56,169,71,.52)";
-    return `<button class="sector-marker ${n===0?"zero-sector":"active-sector"}" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
-      <span class="sector-count" style="background:${bg}">${n}</span>
-      <span class="sector-name">${escapeHtml(l.nombre)}</span>
-    </button>`;
-  }).join("");
-  if(selectedSector) selectSector(selectedSector,false)
+  const complianceFilter=qs("filtroMapaCumplimiento")?.value||"";
+  const rs=filteredForMap().filter(r=>recordMatchesCompliance(r,complianceFilter));
+
+  // Agrupar por nombre normalizado para tolerar mayúsculas, espacios o tildes.
+  const by={};
+  rs.forEach(r=>{
+    const key=normalizeSectorKey(r.Lugar);
+    if(!by[key])by[key]=[];
+    by[key].push(r);
+  });
+
+  // Usar sectorización guardada. Si por alguna razón aún no cargó userSectors,
+  // usar DATA.lugares que también proviene del bootstrap.
+  const sectors=(userSectors&&userSectors.length)?userSectors:(DATA.lugares||[]);
+  qs("sectorMarkers").innerHTML=sectors
+    .map(l=>{
+      const key=normalizeSectorKey(l.nombre);
+      const items=by[key]||[];
+      const n=items.length;
+      if(n===0)return "";
+      const bg=n>=5?"rgba(228,61,48,.95)":n>=3?"rgba(242,138,26,.95)":"rgba(243,198,35,.96)";
+      return `<button class="sector-marker active-sector" style="left:${l.x}%;top:${l.y}%" title="${escapeHtml(l.nombre)} · ${n} trabajos" onclick="selectSector('${escapeHtml(l.nombre).replaceAll("'","\\'")}')">
+        <span class="sector-count" style="background:${bg}">${n}</span>
+        <span class="sector-name">${escapeHtml(l.nombre)}</span>
+      </button>`;
+    }).join("");
+
+  if(selectedSector)selectSector(selectedSector,false);
 }
 window.selectSector=function(nombre,scroll=true){
   selectedSector=nombre;const rs=filteredForMap().filter(r=>r.Lugar===nombre);qs("sectorEmpty").classList.add("hidden");qs("sectorDetail").classList.remove("hidden");qs("sectorNombre").textContent=nombre;qs("sectorTrabajos").textContent=rs.length;qs("sectorTrabajadores").textContent=rs.reduce((s,r)=>s+Number(r.NTrabajadores),0);qs("sectorEmpresas").textContent=new Set(rs.map(r=>r.Empresa)).size;qs("sectorConexos").textContent=conexas.filter(c=>c.Fecha===(qs("mapFiltroFecha").value||today())&&c.Lugar===nombre).reduce((s,c)=>s+c.EmpresasConexas.length,0);
@@ -798,7 +838,7 @@ function listFilters(){
 }
 function renderListaDashboard(){
   const f=listFilters();let rs=registros.filter(r=>(!f.e||r.Empresa===f.e)&&(!f.l||r.Lugar===f.l)&&(!f.a||r.AreaUsuaria===f.a)&&(!f.d||r.Fecha===f.d));
-  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${r.AreaUsuaria}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).join(", ")}</td><td>${arr(r.RiesgosCriticos).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct)}">${r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct}%</span></td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`;
+  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${r.AreaUsuaria}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).join(", ")}</td><td>${arr(r.RiesgosCriticos).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(emergencyComplianceStatsFromRecord(r).pct)}">${emergencyComplianceStatsFromRecord(r).pct}%</span></td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`;
   const ids=new Set(rs.map(r=>r.ID));let cs=conexas.filter(c=>(!f.d||c.Fecha===f.d)&&(!f.l||c.Lugar===f.l)&&(!f.e||c.MiEmpresa===f.e)&&(!f.a||ids.has(c.RegistroID)));
   qs("tablaListaConexas").innerHTML=cs.flatMap(c=>c.EmpresasConexas.map(x=>`<tr><td>${c.ID}</td><td>${c.Fecha}</td><td>${c.MiEmpresa}</td><td>${c.Lugar}</td><td>${x.empresa}</td><td>${x.actividad}</td><td>${x.riesgos.join(", ")}</td><td>${c.HoraGestion}</td></tr>`)).join("")||`<tr><td colspan="8">Sin registros conexos.</td></tr>`;
   qs("dashSectorTitle").textContent=f.l?`Dashboard – ${f.l}`:"Dashboard general";
@@ -816,7 +856,7 @@ function renderListaDashboard(){
 
   const rangos={"0–49%":0,"50–74%":0,"75–99%":0,"100%":0};
   rs.forEach(r=>{
-    const pct=r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct;
+    const pct=emergencyComplianceStatsFromRecord(r).pct;
     const rg=complianceRange(pct);
     if(rg==="0-49")rangos["0–49%"]++;
     if(rg==="50-74")rangos["50–74%"]++;
@@ -852,7 +892,7 @@ async function buildPdfRegistro(r){
   qs("pdfContent").innerHTML=`<div class="pdf-content-grid">
   ${pdfField("Empresa",r.Empresa)}${pdfField("Área usuaria",r.AreaUsuaria)}${pdfField("Trabajo crítico",arr(r.TrabajoCritico).join(", "))}${pdfField("Lugar",r.Lugar)}
   ${pdfField("Fecha",r.Fecha)}${pdfField("Horario",`${r.HoraInicio} – ${r.HoraTermino}`)}${pdfField("Nº trabajadores",r.NTrabajadores)}${pdfField("Descripción del trabajo",r.Descripcion)}
-  ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}${pdfField("Controles de respuesta a emergencias",Object.entries(r.ControlesEmergencia||{}).map(([w,cs])=>`${w}: ${arr(cs).join(", ")}`).join(" | "))}${pdfField("% Cumplimiento respuesta a emergencias",(r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct)+"%")}
+  ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}${pdfField("Controles de respuesta a emergencias",Object.entries(r.ControlesEmergencia||{}).map(([w,cs])=>`${w}: ${arr(cs).join(", ")}`).join(" | "))}${pdfField("% Cumplimiento respuesta a emergencias",(emergencyComplianceStatsFromRecord(r).pct)+"%")}
   </div>
   <h3 class="pdf-section-title">Detalle de ubicación</h3><div class="pdf-map-detail"><img src="${mapDetail}" alt="Detalle del plano"></div>`;
   return renderPdfAndDownload(`${r.ID}_Trabajo_Alto_Riesgo.pdf`)

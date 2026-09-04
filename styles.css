@@ -331,3 +331,28 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
   .emergency-percent-mini{width:100%;display:flex;justify-content:space-between;align-items:center}
   .emergency-percent-mini span,.emergency-percent-mini strong{display:inline;margin:0}
 }
+
+/* REV.11 – controles opcionales y mapa corregido */
+.emergency-check.optional-control span{
+  background:#f6f7f8;
+  border-style:dashed;
+}
+.emergency-check.optional-control span:after{
+  content:" · según evaluación";
+  font-size:8px;
+  font-weight:600;
+  color:#6e7882;
+}
+.emergency-check.optional-control input:checked+span{
+  background:#eef6ff;
+  border-color:#7aa9d8;
+  color:#245a8c;
+}
+.emergency-note{
+  margin-top:7px;
+  padding:7px 9px;
+  border-radius:7px;
+  background:#f7f9fb;
+  color:#66717c;
+  font-size:9px;
+}
