@@ -1,8 +1,23 @@
 const DEFAULT_DATA = {
   empresas:["FGA INGENIEROS S.A.","CORMEI","CIME INGENIEROS","AGEIN","HAUG","M Y S","VERTISUB"],
   trabajos:["Trabajos en caliente","Trabajos en altura","Izaje de Cargas","Aislamiento de Energía","Espacio Confinado"],
-  riesgos:["Proyección de partículas incandescentes","Caída de objetos","Caída de carga","Contacto eléctrico"],
-  areas:["DPA","DPRA","DIA"],
+  riesgos:[
+    "PROYECCIÓN DE MATERIAL CALIENTE",
+    "CAÍDA DE OBJETOS",
+    "CAÍDA DE CARGA SUSPENDIDA",
+    "CONTACTO DIRECTO O INDIRECTO CON ELECTRICIDAD",
+    "DEFICIENCIA DE OXIGENO",
+    "INHALACIÓN DE PRODUCTO QUÍMICO",
+    "DERRUMBE O DESPLOME DE TALUD O PAREDES",
+    "CONTACTO TÉRMICO CON GASES CALIENTES",
+    "VOLCADURA DE EQUIPO DE IZAJE",
+    "CAÍDA DE PERSONAS DE ALTURA",
+    "APRISIONAMIENTO O ATRAPAMIENTO POR PARTES MÓVILES"
+  ],
+  areas:[
+    "ALMC","DMMA","DPRA","DPA","DMEA","DEDA","DALM","DSHIU","DPRC","DMMC",
+    "DMEGC","DISGC","DMEIC","DIA","DMPC","DMPRC","DEPC","DQC","DMAU"
+  ],
   lugares:[
     {nombre:"PREHOMOGENEIZACION DE CEMENTO",x:16.25,y:18.5,rect:[5.5, 7.0, 27.0, 30.0]},
     {nombre:"PREHOMOGENEIZACION DE CARBON",x:16.25,y:49.5,rect:[5.5, 37.0, 27.0, 62.0]},
@@ -170,6 +185,7 @@ function wireEvents(){
   qs("fechaResumen").onchange=()=>renderResumen();
   qs("formRegistro").onsubmit=submitRegistro;
   qs("trabajosCriticos").addEventListener("change",renderEmergencyControls);
+  qs("emergencyControlsContainer").addEventListener("change",updateRegistroEmergencyPercent);
   qs("btnGuardarBorrador").onclick=saveDraft;
   qs("lugar").onchange=()=>setMarkerByLugar(qs("lugar").value);
   qs("mapRegistro").onclick=mapRegistroClick;
@@ -205,13 +221,32 @@ function renderMulti(id, values){
   qs(id).innerHTML=values.map((v,i)=>`<label class="check-chip"><input type="checkbox" value="${escapeHtml(v)}"><span>${escapeHtml(v)}</span></label>`).join("");
 }
 function populateAllSelects(){
+  const current={
+    empresa:qs("empresa")?.value||"",
+    area:qs("areaUsuaria")?.value||"",
+    lugar:qs("lugar")?.value||"",
+    trabajos:selectedMulti("trabajosCriticos"),
+    riesgos:selectedMulti("riesgosCriticos")
+  };
+
   ["empresa","filtroMisEmpresa","conMiEmpresa","filtroConEmpresa","filtroConEmpresaInvolucrada","contEmpresa"].forEach(id=>setOptions(id,DATA.empresas,id.startsWith("filtro")?"Todas":"Seleccione"));
-  setOptions("mapFiltroEmpresa",DATA.empresas,"Todas"); setOptions("listaEmpresa",DATA.empresas,"Todas");
-  ["areaUsuaria"].forEach(id=>setOptions(id,DATA.areas,"Seleccione"));
-  setOptions("mapFiltroArea",DATA.areas,"Todas"); setOptions("listaArea",DATA.areas,"Todas");
-  setOptions("lugar",DATA.lugares.map(x=>x.nombre),"Seleccione"); setOptions("listaLugar",DATA.lugares.map(x=>x.nombre),"Todos");
+  setOptions("mapFiltroEmpresa",DATA.empresas,"Todas");setOptions("listaEmpresa",DATA.empresas,"Todas");
+
+  setOptions("areaUsuaria",DATA.areas,"Seleccione");
+  setOptions("mapFiltroArea",DATA.areas,"Todas");setOptions("listaArea",DATA.areas,"Todas");
+
+  setOptions("lugar",DATA.lugares.map(x=>x.nombre),"Seleccione");
+  setOptions("listaLugar",DATA.lugares.map(x=>x.nombre),"Todos");
+
   setOptions("mapFiltroTrabajo",DATA.trabajos,"Todos");
-  renderMulti("trabajosCriticos",DATA.trabajos); renderMulti("riesgosCriticos",DATA.riesgos);
+  renderMulti("trabajosCriticos",DATA.trabajos);
+  renderMulti("riesgosCriticos",DATA.riesgos);
+
+  if(current.empresa&&DATA.empresas.includes(current.empresa))qs("empresa").value=current.empresa;
+  if(current.area&&DATA.areas.includes(current.area))qs("areaUsuaria").value=current.area;
+  if(current.lugar&&DATA.lugares.some(x=>x.nombre===current.lugar))qs("lugar").value=current.lugar;
+  setMulti("trabajosCriticos",current.trabajos.filter(x=>DATA.trabajos.includes(x)));
+  setMulti("riesgosCriticos",current.riesgos.filter(x=>DATA.riesgos.includes(x)));
 }
 function selectedMulti(id){return [...qs(id).querySelectorAll("input:checked")].map(x=>x.value)}
 function setMulti(id,values=[]){[...qs(id).querySelectorAll("input")].forEach(x=>x.checked=values.includes(x.value))}
@@ -372,6 +407,19 @@ function mapRegistroClick(e){
 
 
 
+function emergencyControlsForWork(work){
+  const raw=String(work||"").trim();
+  if(EMERGENCY_CONTROLS[raw])return EMERGENCY_CONTROLS[raw];
+
+  const n=raw.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  if(n.includes("caliente"))return EMERGENCY_CONTROLS["Trabajos en caliente"]||[];
+  if(n.includes("altura"))return EMERGENCY_CONTROLS["Trabajos en altura"]||[];
+  if(n.includes("izaje"))return EMERGENCY_CONTROLS["Izaje de Cargas"]||[];
+  if(n.includes("aislamiento") || n.includes("energia"))return EMERGENCY_CONTROLS["Aislamiento de Energía"]||[];
+  if(n.includes("confinado"))return EMERGENCY_CONTROLS["Espacio Confinado"]||[];
+  if(n.includes("excav"))return EMERGENCY_CONTROLS["Excavación"]||[];
+  return [];
+}
 function renderEmergencyControls(){
   const box=qs("emergencyControlsContainer");if(!box)return;
   const selected=selectedMulti("trabajosCriticos");
@@ -381,7 +429,7 @@ function renderEmergencyControls(){
     return;
   }
   box.innerHTML=selected.map(work=>{
-    const controls=EMERGENCY_CONTROLS[work]||[];
+    const controls=emergencyControlsForWork(work);
     if(!controls.length)return "";
     return `<div class="emergency-work-group">
       <h4>${escapeHtml(work)}</h4>
@@ -393,6 +441,13 @@ function renderEmergencyControls(){
       </div>
     </div>`;
   }).join("")||'<div class="empty-state-small">No hay controles configurados para esta selección.</div>';
+
+  updateRegistroEmergencyPercent();
+}
+function updateRegistroEmergencyPercent(){
+  const el=qs("registroCumplimientoEmergencia");if(!el)return;
+  const stats=emergencyComplianceStatsFromSelection();
+  el.textContent=stats.pct+"%";
 }
 function selectedEmergencyControls(){
   const out={};
@@ -406,7 +461,7 @@ function selectedEmergencyControls(){
 function hasEmergencySelectionForEachWork(){
   const selected=selectedMulti("trabajosCriticos");
   const chosen=selectedEmergencyControls();
-  return selected.every(work=>!(EMERGENCY_CONTROLS[work]||[]).length || (chosen[work]&&chosen[work].length));
+  return selected.every(work=>!emergencyControlsForWork(work).length || (chosen[work]&&chosen[work].length));
 }
 function setEmergencyControls(data){
   renderEmergencyControls();
@@ -421,7 +476,7 @@ function emergencyComplianceStatsFromSelection(){
   const chosen=selectedEmergencyControls();
   let required=0,implemented=0;
   works.forEach(w=>{
-    const req=(EMERGENCY_CONTROLS[w]||[]);
+    const req=emergencyControlsForWork(w);
     required+=req.length;
     implemented+=(chosen[w]||[]).length;
   });
@@ -433,7 +488,7 @@ function emergencyComplianceStatsFromRecord(r){
   const chosen=r.ControlesEmergencia||{};
   let required=0,implemented=0;
   works.forEach(w=>{
-    const req=(EMERGENCY_CONTROLS[w]||[]);
+    const req=emergencyControlsForWork(w);
     required+=req.length;
     implemented+=(arr(chosen[w])).length;
   });
@@ -978,6 +1033,12 @@ async function loadRemote(){
       }
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
+
+      // REV.10: Google Sheets es la fuente de verdad de catálogos.
+      // Repoblar Empresa, Área Usuaria, Trabajos y Riesgos después del bootstrap.
+      populateAllSelects();
+      renderEmergencyControls();
+
       persist();
       refreshAll();
     }

@@ -76,17 +76,6 @@ PE html>
       </article>
       <article class="card">
         <div class="card-head">
-          <div class="emergency-controls-card">
-            <div class="field-title-row">
-              <div>
-                <strong>Controles ante respuesta a emergencias*</strong>
-                <small>Se muestran según los trabajos críticos seleccionados. Marque los controles que su empresa ya tiene implementados.</small>
-              </div>
-            </div>
-            <div id="emergencyControlsContainer" class="emergency-controls-container">
-              <div class="empty-state-small">Seleccione al menos un trabajo crítico.</div>
-            </div>
-          </div>
 <h2>Riesgos críticos detectados</h2></div>
         <canvas id="chartRiesgos" height="190"></canvas>
       </article>
@@ -134,6 +123,22 @@ PE html>
           <div class="field">
             <span class="label">Riesgos críticos detectados* <small>(selección múltiple)</small></span>
             <div id="riesgosCriticos" class="multi-box"></div>
+          </div>
+        </div>
+
+        <div class="emergency-controls-card">
+          <div class="field-title-row">
+            <div>
+              <strong>Controles ante respuesta a emergencias*</strong>
+              <small>Se muestran automáticamente según los trabajos críticos seleccionados. Marque los controles que su empresa ya tiene implementados.</small>
+            </div>
+            <div class="emergency-percent-mini">
+              <span>Cumplimiento</span>
+              <strong id="registroCumplimientoEmergencia">0%</strong>
+            </div>
+          </div>
+          <div id="emergencyControlsContainer" class="emergency-controls-container">
+            <div class="empty-state-small">Seleccione al menos un trabajo crítico.</div>
           </div>
         </div>
 
