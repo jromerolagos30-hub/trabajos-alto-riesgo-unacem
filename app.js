@@ -58,6 +58,48 @@ const DEFAULT_DATA = {
   ]
 };
 
+const EMERGENCY_CONTROLS = {
+  "Trabajos en caliente":[
+    "Brigada con capacitación en uso de extintores",
+    "Observador de fuego",
+    "Extintor",
+    "Plan de respuesta difundido",
+    "Maletín de primeros auxilios"
+  ],
+  "Trabajos en altura":[
+    "Brigada con capacitación de rescate en trabajos en altura",
+    "Equipo de rescate en altura",
+    "Plan de respuesta difundido",
+    "Cinta antitrauma",
+    "Maletín de primeros auxilios"
+  ],
+  "Izaje de Cargas":[
+    "Brigada de primeros auxilios",
+    "Maletín de primeros auxilios",
+    "Plan de respuesta difundido"
+  ],
+  "Aislamiento de Energía":[
+    "Brigada con capacitación de reanimación cardiopulmonar",
+    "Maletín de primeros auxilios",
+    "Plan de respuesta difundido"
+  ],
+  "Espacio Confinado":[
+    "Brigada con capacitación de rescate en espacios confinados",
+    "Detector de gases",
+    "Vigía de espacio confinado",
+    "Trípode de acuerdo a evaluación",
+    "Sistema de polipastos de acuerdo a evaluación",
+    "Plan de respuesta difundido",
+    "Maletín de primeros auxilios"
+  ],
+  "Excavación":[
+    "Brigada con capacitación de rescate",
+    "Plan de respuesta difundido",
+    "Maletín de primeros auxilios"
+  ]
+};
+
+
 const DEMO_REGISTROS = [
   {ID:"R-1001",Empresa:"FGA INGENIEROS S.A.",AreaUsuaria:"DPA",TrabajoCritico:["Trabajos en altura","Izaje de Cargas"],Lugar:"GSA 1",Fecha:today(),HoraInicio:"08:00",HoraTermino:"17:00",NTrabajadores:8,Descripcion:"Montaje de estructura metálica",RiesgosCriticos:["Caída de objetos","Caída de carga"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:33.6,Y:43.4},
   {ID:"R-1002",Empresa:"CORMEI",AreaUsuaria:"DIA",TrabajoCritico:["Trabajos en caliente"],Lugar:"GSA 1",Fecha:today(),HoraInicio:"09:00",HoraTermino:"15:00",NTrabajadores:5,Descripcion:"Soldadura de soportes",RiesgosCriticos:["Proyección de partículas incandescentes"],Conexas:"SI",EstadoOperativo:"ACTIVO",X:33.6,Y:43.4},
@@ -105,7 +147,7 @@ function isActive(r){return (r.EstadoOperativo||"ACTIVO")!=="FINALIZADO"}
 function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
   qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
-  wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion(); renderConfig(); refreshAll();
+  wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion(); renderConfig(); refreshAll(); renderEmergencyControls();
   loadRemote();
 }
 
@@ -127,6 +169,7 @@ function wireEvents(){
   qs("btnRefresh").onclick=async()=>{await loadRemote();refreshAll();toast("Información actualizada")};
   qs("fechaResumen").onchange=()=>renderResumen();
   qs("formRegistro").onsubmit=submitRegistro;
+  qs("trabajosCriticos").addEventListener("change",renderEmergencyControls);
   qs("btnGuardarBorrador").onclick=saveDraft;
   qs("lugar").onchange=()=>setMarkerByLugar(qs("lugar").value);
   qs("mapRegistro").onclick=mapRegistroClick;
@@ -219,6 +262,13 @@ function makeZoomable(id){
 
 function refreshAll(){
   populateAllSelects(); renderResumen(); renderMisRegistros(); renderConexasTable(); renderMapGeneral(); renderListaDashboard(); updateConRegistroOptions();
+
+  const rsKpi=registros.filter(r=>r.Fecha===(qs("fechaResumen")?.value||today()));
+  const emergencyGlobal=globalEmergencyCompliance(rsKpi);
+  if(qs("kpiCumplimientoEmergencia")){
+    qs("kpiCumplimientoEmergencia").textContent=emergencyGlobal.pct+"%";
+    qs("kpiCumplimientoEmergenciaDetalle").textContent=`${emergencyGlobal.implemented} de ${emergencyGlobal.required} controles implementados`;
+  }
 }
 function filteredRegistros(date=today()){
   return registros.filter(r=>r.Fecha===date && isActive(r));
@@ -321,6 +371,102 @@ function mapRegistroClick(e){
 }
 
 
+
+function renderEmergencyControls(){
+  const box=qs("emergencyControlsContainer");if(!box)return;
+  const selected=selectedMulti("trabajosCriticos");
+  const current=new Set([...document.querySelectorAll(".emergency-control-check:checked")].map(x=>x.value));
+  if(!selected.length){
+    box.innerHTML='<div class="empty-state-small">Seleccione al menos un trabajo crítico.</div>';
+    return;
+  }
+  box.innerHTML=selected.map(work=>{
+    const controls=EMERGENCY_CONTROLS[work]||[];
+    if(!controls.length)return "";
+    return `<div class="emergency-work-group">
+      <h4>${escapeHtml(work)}</h4>
+      <div class="emergency-checks">
+      ${controls.map(c=>{
+        const key=work+"||"+c;
+        return `<label class="emergency-check"><input type="checkbox" class="emergency-control-check" value="${escapeHtml(key)}" ${current.has(key)?"checked":""}><span>${escapeHtml(c)}</span></label>`;
+      }).join("")}
+      </div>
+    </div>`;
+  }).join("")||'<div class="empty-state-small">No hay controles configurados para esta selección.</div>';
+}
+function selectedEmergencyControls(){
+  const out={};
+  document.querySelectorAll(".emergency-control-check:checked").forEach(ch=>{
+    const parts=String(ch.value).split("||");const work=parts.shift(),control=parts.join("||");
+    if(!out[work])out[work]=[];
+    out[work].push(control);
+  });
+  return out;
+}
+function hasEmergencySelectionForEachWork(){
+  const selected=selectedMulti("trabajosCriticos");
+  const chosen=selectedEmergencyControls();
+  return selected.every(work=>!(EMERGENCY_CONTROLS[work]||[]).length || (chosen[work]&&chosen[work].length));
+}
+function setEmergencyControls(data){
+  renderEmergencyControls();
+  const wanted=new Set();
+  Object.entries(data||{}).forEach(([w,list])=>(list||[]).forEach(c=>wanted.add(w+"||"+c)));
+  document.querySelectorAll(".emergency-control-check").forEach(ch=>ch.checked=wanted.has(ch.value));
+}
+
+
+function emergencyComplianceStatsFromSelection(){
+  const works=selectedMulti("trabajosCriticos");
+  const chosen=selectedEmergencyControls();
+  let required=0,implemented=0;
+  works.forEach(w=>{
+    const req=(EMERGENCY_CONTROLS[w]||[]);
+    required+=req.length;
+    implemented+=(chosen[w]||[]).length;
+  });
+  const pct=required?Math.round((implemented/required)*100):0;
+  return {required,implemented,pct};
+}
+function emergencyComplianceStatsFromRecord(r){
+  const works=arr(r.TrabajoCritico);
+  const chosen=r.ControlesEmergencia||{};
+  let required=0,implemented=0;
+  works.forEach(w=>{
+    const req=(EMERGENCY_CONTROLS[w]||[]);
+    required+=req.length;
+    implemented+=(arr(chosen[w])).length;
+  });
+  const pct=required?Math.round((implemented/required)*100):0;
+  return {required,implemented,pct};
+}
+function complianceRange(pct){
+  pct=Number(pct||0);
+  if(pct===100)return "100";
+  if(pct>=75)return "75-99";
+  if(pct>=50)return "50-74";
+  return "0-49";
+}
+function complianceBadgeClass(pct){
+  pct=Number(pct||0);
+  if(pct===100)return "compliance-full";
+  if(pct>=75)return "compliance-high";
+  if(pct>=50)return "compliance-partial";
+  return "compliance-low";
+}
+function recordMatchesCompliance(r,range){
+  if(!range)return true;
+  return complianceRange(r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct)===range;
+}
+function globalEmergencyCompliance(rs){
+  let required=0,implemented=0;
+  rs.forEach(r=>{
+    const s=emergencyComplianceStatsFromRecord(r);
+    required+=s.required;implemented+=s.implemented;
+  });
+  return {required,implemented,pct:required?Math.round((implemented/required)*100):0};
+}
+
 function normalizeText(v){return String(v||"").trim().toLowerCase().replace(/\s+/g," ")}
 function sameArray(a,b){return JSON.stringify([...arr(a)].sort())===JSON.stringify([...arr(b)].sort())}
 function isDuplicateRegistro(r){
@@ -335,12 +481,13 @@ async function submitRegistro(e){
   const tc=selectedMulti("trabajosCriticos"), rc=selectedMulti("riesgosCriticos");
   if(!tc.length)return toast("Seleccione al menos un trabajo crítico");
   if(!rc.length)return toast("Seleccione al menos un riesgo crítico");
+  if(!hasEmergencySelectionForEachWork())return toast("Seleccione al menos un control de respuesta a emergencias para cada trabajo crítico");
   if(!qs("mapX").value || !qs("mapY").value)return toast("Seleccione la ubicación en el plano");
   const existing=qs("registroId").value;
   const r={
     ID:existing||uid("R"),Empresa:qs("empresa").value,AreaUsuaria:qs("areaUsuaria").value,TrabajoCritico:tc,Lugar:qs("lugar").value,
     Fecha:qs("fecha").value,HoraInicio:qs("horaInicio").value,HoraTermino:qs("horaTermino").value,NTrabajadores:Number(qs("nTrabajadores").value),
-    Descripcion:qs("descripcion").value,RiesgosCriticos:rc,Conexas:"NO",EstadoOperativo:"ACTIVO",
+    Descripcion:qs("descripcion").value,RiesgosCriticos:rc,ControlesEmergencia:selectedEmergencyControls(),NControlesEmergenciaRequeridos:emergencyComplianceStatsFromSelection().required,NControlesEmergenciaImplementados:emergencyComplianceStatsFromSelection().implemented,PorcentajeCumplimientoEmergencia:emergencyComplianceStatsFromSelection().pct,Conexas:"NO",EstadoOperativo:"ACTIVO",
     X:Number(qs("mapX").value),Y:Number(qs("mapY").value),Actualizado:new Date().toISOString()
   };
   if(!existing && isDuplicateRegistro(r)){
@@ -366,7 +513,7 @@ function saveDraft(){
 }
 function resetRegistroForm(){
   qs("formRegistro").reset();qs("registroId").value="";qs("fecha").value=today();qs("horaInicio").value=nowTime();qs("horaTermino").value="17:00";qs("nTrabajadores").value=1;
-  clearMarker();setMulti("trabajosCriticos",[]);setMulti("riesgosCriticos",[])
+  clearMarker();setMulti("trabajosCriticos",[]);setMulti("riesgosCriticos",[]);renderEmergencyControls()
 }
 
 function renderMisRegistros(){
@@ -376,7 +523,7 @@ function renderMisRegistros(){
   <td><button class="btn mini secondary" onclick="editRegistro('${r.ID}')">Editar</button><button class="btn mini secondary" onclick="openConexaFor('${r.ID}')">Conexa</button>${isActive(r)?`<button class="btn mini secondary" onclick="finalizarRegistro('${r.ID}')">Finalizar</button>`:"<b>Finalizado</b>"}<button class="btn mini secondary" onclick="continuarRegistro('${r.ID}')">Continuar mañana</button></td></tr>`).join("")||`<tr><td colspan="7">Sin registros.</td></tr>`
 }
 window.editRegistro=function(id){
-  const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;window.scrollTo({top:0,behavior:"smooth"})
+  const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;window.scrollTo({top:0,behavior:"smooth"})
 }
 window.finalizarRegistro=async function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;
@@ -385,7 +532,7 @@ window.finalizarRegistro=async function(id){
 }
 window.continuarRegistro=function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;const d=new Date(r.Fecha+"T12:00:00");d.setDate(d.getDate()+1);const next=d.toISOString().slice(0,10);
-  showView("registro");qs("registroId").value="";qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=next;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;toast("Actividad copiada. Revise y actualice antes de registrar.")
+  showView("registro");qs("registroId").value="";qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=next;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;toast("Actividad copiada. Revise y actualice antes de registrar.")
 }
 function openContinue(){qs("continueModal").classList.remove("hidden");renderContinueTable()}
 function renderContinueTable(){
@@ -574,7 +721,7 @@ function filteredForMap(){
   return registros.filter(r=>r.Fecha===d&&isActive(r)&&(!t||arr(r.TrabajoCritico).includes(t))&&(!e||r.Empresa===e)&&(!a||r.AreaUsuaria===a))
 }
 function renderMapGeneral(){
-  const rs=filteredForMap(),by={};rs.forEach(r=>(by[r.Lugar]??=[]).push(r));
+  const rs=filteredForMap(),by={}.filter(r=>recordMatchesCompliance(r,qs("filtroMapaCumplimiento")?.value||""));rs.forEach(r=>(by[r.Lugar]??=[]).push(r));
   qs("sectorMarkers").innerHTML=(userSectors||[]).filter(l=>(by[l.nombre]||[]).length>0).map(l=>{
     const n=(by[l.nombre]||[]).length;
     const bg=n>=5?"rgba(228,61,48,.62)":n>=3?"rgba(242,138,26,.62)":n>=1?"rgba(243,198,35,.68)":"rgba(56,169,71,.52)";
@@ -596,12 +743,32 @@ function listFilters(){
 }
 function renderListaDashboard(){
   const f=listFilters();let rs=registros.filter(r=>(!f.e||r.Empresa===f.e)&&(!f.l||r.Lugar===f.l)&&(!f.a||r.AreaUsuaria===f.a)&&(!f.d||r.Fecha===f.d));
-  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${r.AreaUsuaria}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).join(", ")}</td><td>${arr(r.RiesgosCriticos).join(", ")}</td><td>${r.NTrabajadores}</td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`;
+  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${r.AreaUsuaria}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).join(", ")}</td><td>${arr(r.RiesgosCriticos).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct)}">${r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct}%</span></td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`;
   const ids=new Set(rs.map(r=>r.ID));let cs=conexas.filter(c=>(!f.d||c.Fecha===f.d)&&(!f.l||c.Lugar===f.l)&&(!f.e||c.MiEmpresa===f.e)&&(!f.a||ids.has(c.RegistroID)));
   qs("tablaListaConexas").innerHTML=cs.flatMap(c=>c.EmpresasConexas.map(x=>`<tr><td>${c.ID}</td><td>${c.Fecha}</td><td>${c.MiEmpresa}</td><td>${c.Lugar}</td><td>${x.empresa}</td><td>${x.actividad}</td><td>${x.riesgos.join(", ")}</td><td>${c.HoraGestion}</td></tr>`)).join("")||`<tr><td colspan="8">Sin registros conexos.</td></tr>`;
   qs("dashSectorTitle").textContent=f.l?`Dashboard – ${f.l}`:"Dashboard general";
   drawChart("chartSectorCriticos",countFlat(rs,"TrabajoCritico"),"doughnut");
   const byEmp={};rs.forEach(r=>byEmp[r.Empresa]=(byEmp[r.Empresa]||0)+Number(r.NTrabajadores||0));drawChart("chartSectorEmpresa",byEmp,"bar")
+
+  const byEmpresa={};
+  rs.forEach(r=>{
+    const s=emergencyComplianceStatsFromRecord(r);
+    if(!byEmpresa[r.Empresa])byEmpresa[r.Empresa]={req:0,imp:0};
+    byEmpresa[r.Empresa].req+=s.required;byEmpresa[r.Empresa].imp+=s.implemented;
+  });
+  const cumplimientoEmpresa=Object.fromEntries(Object.entries(byEmpresa).map(([e,v])=>[e,v.req?Math.round(v.imp/v.req*100):0]));
+  drawChart("chartCumplimientoEmpresa",cumplimientoEmpresa,"bar");
+
+  const rangos={"0–49%":0,"50–74%":0,"75–99%":0,"100%":0};
+  rs.forEach(r=>{
+    const pct=r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct;
+    const rg=complianceRange(pct);
+    if(rg==="0-49")rangos["0–49%"]++;
+    if(rg==="50-74")rangos["50–74%"]++;
+    if(rg==="75-99")rangos["75–99%"]++;
+    if(rg==="100")rangos["100%"]++;
+  });
+  drawChart("chartRangosCumplimiento",rangos,"bar");
 }
 
 async function makeMapDetailImage(r){
@@ -630,7 +797,7 @@ async function buildPdfRegistro(r){
   qs("pdfContent").innerHTML=`<div class="pdf-content-grid">
   ${pdfField("Empresa",r.Empresa)}${pdfField("Área usuaria",r.AreaUsuaria)}${pdfField("Trabajo crítico",arr(r.TrabajoCritico).join(", "))}${pdfField("Lugar",r.Lugar)}
   ${pdfField("Fecha",r.Fecha)}${pdfField("Horario",`${r.HoraInicio} – ${r.HoraTermino}`)}${pdfField("Nº trabajadores",r.NTrabajadores)}${pdfField("Descripción del trabajo",r.Descripcion)}
-  ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}
+  ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}${pdfField("Controles de respuesta a emergencias",Object.entries(r.ControlesEmergencia||{}).map(([w,cs])=>`${w}: ${arr(cs).join(", ")}`).join(" | "))}${pdfField("% Cumplimiento respuesta a emergencias",(r.PorcentajeCumplimientoEmergencia ?? emergencyComplianceStatsFromRecord(r).pct)+"%")}
   </div>
   <h3 class="pdf-section-title">Detalle de ubicación</h3><div class="pdf-map-detail"><img src="${mapDetail}" alt="Detalle del plano"></div>`;
   return renderPdfAndDownload(`${r.ID}_Trabajo_Alto_Riesgo.pdf`)

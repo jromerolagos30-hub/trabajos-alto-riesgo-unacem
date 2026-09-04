@@ -1,4 +1,14 @@
-<!DOCTYPE html>
+<!DOCTY
+          <label>Cumplimiento emergencia
+            <select id="filtroListaCumplimiento">
+              <option value="">Todos</option>
+              <option value="0-49">0–49% · Bajo</option>
+              <option value="50-74">50–74% · Parcial</option>
+              <option value="75-99">75–99% · Alto</option>
+              <option value="100">100% · Completo</option>
+            </select>
+          </label>
+PE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -51,7 +61,13 @@
       <article class="kpi"><span>Empresas activas</span><strong id="kpiEmpresas">0</strong></article>
       <article class="kpi"><span>Nº trabajos conexos</span><strong id="kpiConexos">0</strong></article>
       <article class="kpi"><span>Riesgos críticos</span><strong id="kpiRiesgos">0</strong></article>
-    </div>
+    
+        <div class="kpi-card emergency-kpi">
+          <span>Cumplimiento controles de emergencia</span>
+          <strong id="kpiCumplimientoEmergencia">0%</strong>
+          <small id="kpiCumplimientoEmergenciaDetalle">0 de 0 controles implementados</small>
+        </div>
+</div>
 
     <div class="grid two">
       <article class="card">
@@ -59,7 +75,19 @@
         <canvas id="chartCriticos" height="190"></canvas>
       </article>
       <article class="card">
-        <div class="card-head"><h2>Riesgos críticos detectados</h2></div>
+        <div class="card-head">
+          <div class="emergency-controls-card">
+            <div class="field-title-row">
+              <div>
+                <strong>Controles ante respuesta a emergencias*</strong>
+                <small>Se muestran según los trabajos críticos seleccionados. Marque los controles que su empresa ya tiene implementados.</small>
+              </div>
+            </div>
+            <div id="emergencyControlsContainer" class="emergency-controls-container">
+              <div class="empty-state-small">Seleccione al menos un trabajo crítico.</div>
+            </div>
+          </div>
+<h2>Riesgos críticos detectados</h2></div>
         <canvas id="chartRiesgos" height="190"></canvas>
       </article>
     </div>
@@ -282,6 +310,16 @@
         <label>Empresa <select id="mapFiltroEmpresa"><option value="">Todas</option></select></label>
         <label>Área usuaria <select id="mapFiltroArea"><option value="">Todas</option></select></label>
         <label>Fecha <input id="mapFiltroFecha" type="date"></label>
+        <label>Cumplimiento emergencia
+          <select id="filtroMapaCumplimiento">
+            <option value="">Todos</option>
+            <option value="0-49">0–49% · Bajo</option>
+            <option value="50-74">50–74% · Parcial</option>
+            <option value="75-99">75–99% · Alto</option>
+            <option value="100">100% · Completo</option>
+          </select>
+        </label>
+
       </div>
     </div>
 
@@ -321,7 +359,18 @@
         </div>
       </aside>
     </div>
-  </section>
+  
+      <div class="dashboard-grid emergency-dashboard-grid">
+        <article class="card">
+          <h2>Cumplimiento de emergencia por empresa</h2>
+          <canvas id="chartCumplimientoEmpresa"></canvas>
+        </article>
+        <article class="card">
+          <h2>Actividades por rango de cumplimiento</h2>
+          <canvas id="chartRangosCumplimiento"></canvas>
+        </article>
+      </div>
+</section>
 
   <!-- LISTA/DASHBOARD -->
   <section id="view-lista" class="view">
