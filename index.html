@@ -1,14 +1,4 @@
-<!DOCTY
-          <label>Cumplimiento emergencia
-            <select id="filtroListaCumplimiento">
-              <option value="">Todos</option>
-              <option value="0-49">0–49% · Bajo</option>
-              <option value="50-74">50–74% · Parcial</option>
-              <option value="75-99">75–99% · Alto</option>
-              <option value="100">100% · Completo</option>
-            </select>
-          </label>
-PE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -61,23 +51,22 @@ PE html>
       <article class="kpi"><span>Empresas activas</span><strong id="kpiEmpresas">0</strong></article>
       <article class="kpi"><span>Nº trabajos conexos</span><strong id="kpiConexos">0</strong></article>
       <article class="kpi"><span>Riesgos críticos</span><strong id="kpiRiesgos">0</strong></article>
-    
-        <div class="kpi-card emergency-kpi">
-          <span>Cumplimiento controles de emergencia</span>
-          <strong id="kpiCumplimientoEmergencia">0%</strong>
-          <small id="kpiCumplimientoEmergenciaDetalle">0 de 0 controles implementados</small>
-        </div>
-</div>
+      <article class="kpi emergency-kpi">
+        <span>Cumplimiento controles de emergencia</span>
+        <strong id="kpiCumplimientoEmergencia">0%</strong>
+        <small id="kpiCumplimientoEmergenciaDetalle">0 de 0 controles implementados</small>
+      </article>
+    </div>
 
     <div class="grid two">
       <article class="card">
         <div class="card-head"><h2>Trabajos críticos del día</h2></div>
-        <canvas id="chartCriticos" height="190"></canvas>
+        <div class="chart-scroll inicio-chart"><canvas id="chartCriticos"></canvas></div>
       </article>
       <article class="card">
         <div class="card-head">
 <h2>Riesgos críticos detectados</h2></div>
-        <canvas id="chartRiesgos" height="190"></canvas>
+        <div class="chart-scroll inicio-chart"><canvas id="chartRiesgos"></canvas></div>
       </article>
     </div>
 

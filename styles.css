@@ -381,3 +381,18 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
   .missing-cell{min-width:230px;max-width:280px}
   #conActividadManualBox .form-grid{grid-template-columns:1fr!important}
 }
+
+
+/* REV.11.1 – corrección exclusiva de Inicio */
+#view-inicio .kpi-grid{grid-template-columns:repeat(6,minmax(0,1fr));align-items:stretch}
+#view-inicio .emergency-kpi{min-width:0}
+#view-inicio .inicio-chart{height:330px;max-height:330px;overflow:hidden}
+#view-inicio .inicio-chart canvas{width:100%!important;height:100%!important;display:block}
+@media(max-width:1200px){
+  #view-inicio .kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  #view-inicio .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #view-inicio .inicio-chart{height:300px;max-height:300px}
+  #view-inicio .card{overflow:hidden}
+}
