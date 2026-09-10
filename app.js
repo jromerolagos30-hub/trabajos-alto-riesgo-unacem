@@ -205,6 +205,7 @@ function wireEvents(){
   qs("contEmpresa").onchange=renderContinueTable; qs("contFecha").onchange=renderContinueTable;
 
   qs("conMiEmpresa").onchange=updateConRegistroOptions; qs("conFecha").onchange=updateConRegistroOptions; qs("conRegistroPropio").onchange=renderConexaOwnRecord;
+  qs("conLugarManual").onchange=()=>{const l=DATA.lugares.find(x=>x.nombre===qs("conLugarManual").value);if(l)positionMarker(qs("conexaMarker"),l.x,l.y,l.nombre)};
   qs("conFotoReunion").onchange=handleConexaPhoto;
   qs("btnAgregarEmpresaConexa").onclick=()=>addConexaCompany();
   qs("formConexa").onsubmit=submitConexa;
@@ -276,8 +277,7 @@ function makeZoomable(id){
     <button type="button" data-z="reset" aria-label="Restablecer">⛶</button>
     <div class="zoom-value">100%</div>`;
   map.insertBefore(controls,stage);
-  const isMobileMap=()=>window.matchMedia("(max-width:700px)").matches;
-  map._zoom=isMobileMap()?3.5:1;
+  map._zoom=1;
   const apply=()=>{
     const z=map._zoom;
     stage.style.width=(z*100)+"%";
@@ -293,19 +293,14 @@ function makeZoomable(id){
     ev.stopPropagation();
     const a=ev.target.dataset.z; if(!a)return;
     if(a==="in") map._zoom=Math.min(3.5,map._zoom+0.5);
-    if(a==="out") map._zoom=isMobileMap()?3.5:Math.max(1,map._zoom-0.5);
-    if(a==="reset"){
-      map._zoom=isMobileMap()?3.5:1;
-      map.scrollTo({left:0,top:0,behavior:"smooth"});
-    }
+    if(a==="out") map._zoom=Math.max(1,map._zoom-0.5);
+    if(a==="reset"){map._zoom=1;map.scrollTo({left:0,top:0,behavior:"smooth"})}
     apply();
   });
   map.addEventListener("dblclick",ev=>{
     if(ev.target.closest(".map-zoom-controls"))return;
     ev.preventDefault();
-    if(isMobileMap()){ map._zoom=3.5; }
-    else { map._zoom=map._zoom<2?2:1; }
-    apply();
+    map._zoom=map._zoom<2?2:1; apply();
   });
   apply();
 }
@@ -349,7 +344,11 @@ const valueLabelsPlugin={
       meta.data.forEach((el,i)=>{
         const v=Number(ds.data[i]||0); if(!v)return;
         if(chart.config.type==="bar"){
-          const p=el.tooltipPosition();ctx.fillText(String(v),p.x,p.y-10);
+          const p=el.tooltipPosition();
+          const horizontal=chart.options.indexAxis==="y";
+          ctx.textAlign=horizontal?"left":"center";
+          ctx.fillText(String(v),horizontal?p.x+7:p.x,horizontal?p.y:p.y-10);
+          ctx.textAlign="center";
         }else if(chart.config.type==="doughnut"){
           const p=el.tooltipPosition();ctx.fillStyle="#17212b";ctx.fillText(String(v),p.x,p.y);
         }
@@ -358,12 +357,41 @@ const valueLabelsPlugin={
   }
 };
 Chart.register(valueLabelsPlugin);
-function drawChart(id,data,type){
-  const ctx=qs(id); if(charts[id]) charts[id].destroy();
-  const labels=Object.keys(data), vals=Object.values(data);
-  charts[id]=new Chart(ctx,{type,data:{labels,datasets:[{data:vals,borderWidth:1}]},options:{responsive:true,layout:{padding:{top:16}},plugins:{legend:{display:type==="doughnut",position:"right"},valueLabels:{}},scales:type==="doughnut"?{}:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+function isMobileChart(){return window.matchMedia("(max-width: 700px)").matches}
+function setChartCanvasHeight(id,count=0,type="bar"){
+  const canvas=qs(id);if(!canvas)return;
+  const wrap=canvas.closest(".chart-scroll");if(!wrap)return;
+  if(type==="doughnut"){
+    wrap.style.height=isMobileChart()?"300px":"330px";
+  }else if(isMobileChart()){
+    wrap.style.height=Math.max(300,Math.min(760,120+Math.max(count,1)*44))+"px";
+  }else{
+    wrap.style.height=Math.max(310,Math.min(560,180+Math.max(count,1)*24))+"px";
+  }
 }
-
+function drawChart(id,data,type,opts={}){
+  const ctx=qs(id); if(!ctx)return; if(charts[id]) charts[id].destroy();
+  const labels=Object.keys(data), vals=Object.values(data), mobile=isMobileChart();
+  const useHorizontal=type==="bar" && (opts.horizontalOnMobile!==false) && mobile;
+  setChartCanvasHeight(id,labels.length,type);
+  charts[id]=new Chart(ctx,{type,data:{labels,datasets:[{label:opts.datasetLabel||"Cantidad",data:vals,borderWidth:1}]},options:{
+    responsive:true,maintainAspectRatio:false,indexAxis:useHorizontal?"y":"x",
+    layout:{padding:{top:useHorizontal?8:20,right:useHorizontal?28:8,bottom:8,left:8}},
+    plugins:{legend:{display:type==="doughnut",position:mobile?"bottom":"right"},valueLabels:{},tooltip:{callbacks:{title:(items)=>items?.[0]?.label||""}}},
+    scales:type==="doughnut"?{}:(useHorizontal?{
+      x:{beginAtZero:true,ticks:{precision:0}},
+      y:{ticks:{autoSkip:false,font:{size:10},callback:function(v){const t=this.getLabelForValue(v);return t.length>32?t.slice(0,31)+"…":t}}}
+    }:{
+      y:{beginAtZero:true,ticks:{precision:0}},
+      x:{ticks:{autoSkip:false,maxRotation:labels.some(x=>String(x).length>18)?45:0,minRotation:0,font:{size:10}}}
+    })
+  }});
+}
+function countMissingEmergencyControls(rs){
+  const out={};
+  rs.forEach(r=>missingEmergencyControlsFromRecord(r).forEach(x=>out[x.control]=(out[x.control]||0)+1));
+  return out;
+}
 
 function pointInRect(x,y,rect){
   return Array.isArray(rect) && rect.length===4 && x>=rect[0] && x<=rect[2] && y>=rect[1] && y<=rect[3];
@@ -518,6 +546,39 @@ function emergencyComplianceStatsFromRecord(r){
   const pct=required?Math.round((implemented/required)*100):0;
   return {required,implemented,pct};
 }
+function missingEmergencyControlsFromSelection(){
+  const works=selectedMulti("trabajosCriticos"),chosen=selectedEmergencyControls(),out=[];
+  works.forEach(work=>{
+    const implemented=new Set(arr(chosen[work]).filter(c=>!isOptionalEmergencyControl(c)));
+    emergencyControlsForWork(work).filter(c=>!isOptionalEmergencyControl(c)).forEach(control=>{
+      if(!implemented.has(control))out.push({work,control});
+    });
+  });
+  return out;
+}
+function missingEmergencyControlsFromRecord(r){
+  if(Array.isArray(r.ControlesEmergenciaFaltantes)){
+    return r.ControlesEmergenciaFaltantes.map(x=>typeof x==="string"?{work:"",control:x}:x).filter(x=>x&&x.control);
+  }
+  if(typeof r.ControlesEmergenciaFaltantes==="string"&&r.ControlesEmergenciaFaltantes.trim()){
+    try{const x=JSON.parse(r.ControlesEmergenciaFaltantes);if(Array.isArray(x))return x.map(v=>typeof v==="string"?{work:"",control:v}:v)}catch(e){}
+  }
+  const works=arr(r.TrabajoCritico),chosen=r.ControlesEmergencia||{},out=[];
+  works.forEach(work=>{
+    const implemented=new Set(arr(chosen[work]).filter(c=>!isOptionalEmergencyControl(c)));
+    emergencyControlsForWork(work).filter(c=>!isOptionalEmergencyControl(c)).forEach(control=>{
+      if(!implemented.has(control))out.push({work,control});
+    });
+  });
+  return out;
+}
+function missingEmergencyText(r){
+  const m=missingEmergencyControlsFromRecord(r);
+  if(!m.length)return "Ninguno";
+  const by={};m.forEach(x=>{const w=x.work||"Control";(by[w]||(by[w]=[])).push(x.control)});
+  return Object.entries(by).map(([w,cs])=>`${w}: ${[...new Set(cs)].join(", ")}`).join(" | ");
+}
+
 function complianceRange(pct){
   pct=Number(pct||0);
   if(pct===100)return "100";
@@ -565,7 +626,7 @@ async function submitRegistro(e){
   const r={
     ID:existing||uid("R"),Empresa:qs("empresa").value,AreaUsuaria:qs("areaUsuaria").value,TrabajoCritico:tc,Lugar:qs("lugar").value,
     Fecha:qs("fecha").value,HoraInicio:qs("horaInicio").value,HoraTermino:qs("horaTermino").value,NTrabajadores:Number(qs("nTrabajadores").value),
-    Descripcion:qs("descripcion").value,RiesgosCriticos:rc,ControlesEmergencia:selectedEmergencyControls(),NControlesEmergenciaRequeridos:emergencyComplianceStatsFromSelection().required,NControlesEmergenciaImplementados:emergencyComplianceStatsFromSelection().implemented,PorcentajeCumplimientoEmergencia:emergencyComplianceStatsFromSelection().pct,Conexas:"NO",EstadoOperativo:"ACTIVO",
+    Descripcion:qs("descripcion").value,RiesgosCriticos:rc,ControlesEmergencia:selectedEmergencyControls(),ControlesEmergenciaFaltantes:missingEmergencyControlsFromSelection(),NControlesEmergenciaRequeridos:emergencyComplianceStatsFromSelection().required,NControlesEmergenciaImplementados:emergencyComplianceStatsFromSelection().implemented,PorcentajeCumplimientoEmergencia:emergencyComplianceStatsFromSelection().pct,Conexas:"NO",EstadoOperativo:"ACTIVO",
     X:Number(qs("mapX").value),Y:Number(qs("mapY").value),Actualizado:new Date().toISOString()
   };
   if(!existing && isDuplicateRegistro(r)){
@@ -597,8 +658,8 @@ function resetRegistroForm(){
 function renderMisRegistros(){
   const emp=qs("filtroMisEmpresa").value, d=qs("filtroMisFecha").value||today();
   const rs=registros.filter(r=>r.Fecha===d && (!emp||r.Empresa===emp));
-  qs("tablaMisRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).join(", ")}</td><td>${r.HoraInicio}–${r.HoraTermino}</td><td>${r.NTrabajadores}</td>
-  <td><button class="btn mini secondary" onclick="editRegistro('${r.ID}')">Editar</button><button class="btn mini secondary" onclick="openConexaFor('${r.ID}')">Conexa</button>${isActive(r)?`<button class="btn mini secondary" onclick="finalizarRegistro('${r.ID}')">Finalizar</button>`:"<b>Finalizado</b>"}<button class="btn mini secondary" onclick="continuarRegistro('${r.ID}')">Continuar mañana</button></td></tr>`).join("")||`<tr><td colspan="7">Sin registros.</td></tr>`
+  qs("tablaMisRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}</td><td class="desc-cell">${escapeHtml(r.Descripcion||"")}</td><td>${r.HoraInicio}–${r.HoraTermino}</td><td>${r.NTrabajadores}</td>
+  <td><button class="btn mini secondary" onclick="editRegistro('${r.ID}')">Editar</button><button class="btn mini secondary" onclick="openConexaFor('${r.ID}')">Conexa</button>${isActive(r)?`<button class="btn mini secondary" onclick="finalizarRegistro('${r.ID}')">Finalizar</button>`:"<b>Finalizado</b>"}<button class="btn mini secondary" onclick="continuarRegistro('${r.ID}')">Continuar mañana</button></td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`
 }
 window.editRegistro=function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;window.scrollTo({top:0,behavior:"smooth"})
@@ -621,18 +682,27 @@ window.pickContinue=function(id){qs("continueModal").classList.add("hidden");con
 
 function updateConRegistroOptions(){
   const emp=qs("conMiEmpresa").value,d=qs("conFecha").value||today();const rs=registros.filter(r=>r.Empresa===emp&&r.Fecha===d);
-  qs("conRegistroPropio").innerHTML=`<option value="">Seleccione</option>`+rs.map(r=>`<option value="${r.ID}">${r.ID} · ${escapeHtml(r.Lugar)} · ${escapeHtml(arr(r.TrabajoCritico).join(", "))}</option>`).join("");
+  const prev=qs("conRegistroPropio").value;
+  qs("conRegistroPropio").innerHTML=`<option value="">Seleccione</option>`+rs.map(r=>`<option value="${r.ID}">${r.ID} · ${escapeHtml(r.Lugar)} · ${escapeHtml(arr(r.TrabajoCritico).join(", "))}</option>`).join("")+`<option value="__OTRA__">Otros · Actividad no registrada como alto riesgo</option>`;
+  setOptions("conLugarManual",DATA.lugares.map(x=>x.nombre),"Seleccione");
+  if([...qs("conRegistroPropio").options].some(o=>o.value===prev))qs("conRegistroPropio").value=prev;
   renderConexaOwnRecord()
 }
 function renderConexaOwnRecord(){
-  const r=registros.find(x=>x.ID===qs("conRegistroPropio").value);const marker=qs("conexaMarker"),box=qs("conActividadResumen");
+  const value=qs("conRegistroPropio").value,isOther=value==="__OTRA__";
+  const r=registros.find(x=>x.ID===value);const marker=qs("conexaMarker"),box=qs("conActividadResumen"),manual=qs("conActividadManualBox");
+  manual.classList.toggle("hidden",!isOther);
+  qs("conActividadManual").required=isOther;qs("conLugarManual").required=isOther;
+  if(isOther){
+    marker.classList.add("hidden");box.classList.add("hidden");box.innerHTML="";
+    return;
+  }
   if(!r){marker.classList.add("hidden");box.classList.add("hidden");box.innerHTML="";return}
   positionMarker(marker,r.X,r.Y,r.Lugar);
   box.classList.remove("hidden");
   box.innerHTML=`<strong>${escapeHtml(r.Empresa)} · ${escapeHtml(r.Lugar)}</strong>
     ${escapeHtml(r.Descripcion)}<br><b>Trabajos críticos:</b> ${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}
     <br><b>Riesgos reportados:</b> ${arr(r.RiesgosCriticos).map(escapeHtml).join(", ")}`;
-  // En cada empresa conexa, preselecciona los riesgos de la actividad propia.
   qs("empresasConexas").querySelectorAll(".conexa-item").forEach(item=>{
     item.querySelectorAll(".cx-risk").forEach(ch=>ch.checked=arr(r.RiesgosCriticos).includes(ch.value));
   });
@@ -738,7 +808,7 @@ async function handleConexaPhoto(e){
 }
 function conexaSignature(c){
   return JSON.stringify({
-    r:c.RegistroID,m:c.MiEmpresa,f:c.Fecha,
+    r:c.RegistroID,m:c.MiEmpresa,f:c.Fecha,t:c.TipoActividadPropia||"REGISTRADA_TAR",am:normalizeText(c.ActividadPropiaManual||""),l:c.Lugar,
     e:(c.EmpresasConexas||[]).map(x=>({e:x.empresa,a:normalizeText(x.actividad),r:[...x.riesgos].sort(),c:normalizeText(x.controles),j:normalizeText(x.jefe),s:normalizeText(x.ssoma)})).sort((a,b)=>a.e.localeCompare(b.e)),
     o:normalizeText(c.Observaciones)
   });
@@ -750,30 +820,30 @@ function isDuplicateConexa(c){
 
 async function submitConexa(e){
   e.preventDefault();if(isSavingConexa)return;
-  const r=registros.find(x=>x.ID===qs("conRegistroPropio").value);if(!r)return toast("Seleccione la actividad propia reportada");
+  const ownValue=qs("conRegistroPropio").value,isOther=ownValue==="__OTRA__";
+  const r=isOther?null:registros.find(x=>x.ID===ownValue);
+  if(!isOther&&!r)return toast("Seleccione la actividad propia reportada");
+  if(isOther&&!qs("conActividadManual").value.trim())return toast("Describa la actividad propia no TAR");
+  if(isOther&&!qs("conLugarManual").value)return toast("Seleccione el lugar / sector de la actividad no TAR");
   const empresas=collectConexas();if(!empresas.length)return toast("Agregue al menos una empresa conexa");
   if(empresas.some(x=>!x.riesgos.length))return toast("Cada empresa conexa debe tener al menos un riesgo crítico seleccionado");
   if(!qs("conObservaciones").value.trim())return toast("Complete el campo Observaciones / acuerdos antes de guardar la coordinación");
   if(!pendingConexaPhoto)return toast("La foto o archivo del registro de reunión es obligatorio");
-  const editId=qs("conexaEditId").value;
-  const current=editId?conexas.find(x=>x.ID===editId):null;
-  const c={ID:editId||uid("C"),RegistroID:r.ID,Fecha:qs("conFecha").value,HoraGestion:qs("conHora").value,MiEmpresa:qs("conMiEmpresa").value,Lugar:r.Lugar,JefePropio:qs("conJefePropio").value,SsomaPropio:qs("conSsomaPropio").value,EmpresasConexas:empresas,Observaciones:qs("conObservaciones").value,Actualizado:new Date().toLocaleString(),Version:Number(current?.Version||0)+1,Estado:"ACTIVO",ArchivoReunion:pendingConexaPhoto};
-  if(!editId && isDuplicateConexa(c)){
-    alert("Esta coordinación ya fue registrada con los mismos detalles. Revise el registro existente antes de volver a enviarla.");
-    return;
-  }
+  const editId=qs("conexaEditId").value,current=editId?conexas.find(x=>x.ID===editId):null;
+  const manualActivity=isOther?qs("conActividadManual").value.trim():"";
+  const lugar=isOther?qs("conLugarManual").value:r.Lugar;
+  const c={ID:editId||uid("C"),RegistroID:isOther?"":r.ID,TipoActividadPropia:isOther?"OTRA_NO_TAR":"REGISTRADA_TAR",ActividadPropiaManual:manualActivity,Fecha:qs("conFecha").value,HoraGestion:qs("conHora").value,MiEmpresa:qs("conMiEmpresa").value,Lugar:lugar,JefePropio:qs("conJefePropio").value,SsomaPropio:qs("conSsomaPropio").value,EmpresasConexas:empresas,Observaciones:qs("conObservaciones").value,Actualizado:new Date().toLocaleString(),Version:Number(current?.Version||0)+1,Estado:"ACTIVO",ArchivoReunion:pendingConexaPhoto};
+  if(!editId && isDuplicateConexa(c)){alert("Esta coordinación ya fue registrada con los mismos detalles. Revise el registro existente antes de volver a enviarla.");return;}
   const btn=qs("btnSubmitConexa");isSavingConexa=true;btn.disabled=true;const prev=btn.textContent;btn.textContent="Procesando coordinación...";
   try{
     if(current){Object.assign(current,c)}else conexas.push(c);
     persist();addHistoryLocal("CONEXA",c.ID,current?"EDICIÓN":"ALTA",c.MiEmpresa);
     if(CONFIG.apiUrl)await postRemote({action:"saveConexa",conexa:{...c,ArchivoReunion:pendingConexaPhoto}});
-    const pdf=await buildPdfConexa(c,r);
+    const pdf=await buildPdfConexa(c,r||{Empresa:c.MiEmpresa,Lugar:c.Lugar,Descripcion:c.ActividadPropiaManual,TrabajoCritico:["Actividad no TAR"],RiesgosCriticos:[],X:(DATA.lugares.find(x=>x.nombre===c.Lugar)?.x||50),Y:(DATA.lugares.find(x=>x.nombre===c.Lugar)?.y||50)});
     if(CONFIG.apiUrl)await sendPdfRemote(pdf,{Empresa:c.MiEmpresa,ID:c.ID},empresas.map(x=>x.empresa),"COORDINACIÓN DE ACTIVIDADES CONEXAS");
     toast("Coordinación registrada y PDF generado");
-    qs("formConexa").reset();qs("conexaEditId").value="";qs("conFecha").value=today();qs("conHora").value=nowTime();qs("empresasConexas").innerHTML="";pendingConexaPhoto="";qs("conFotoPreview").innerHTML="";qs("conFotoPreview").classList.add("hidden");refreshAll();
-  }finally{
-    isSavingConexa=false;btn.disabled=false;btn.textContent=prev;
-  }
+    qs("formConexa").reset();qs("conexaEditId").value="";qs("conFecha").value=today();qs("conHora").value=nowTime();qs("empresasConexas").innerHTML="";pendingConexaPhoto="";qs("conFotoPreview").innerHTML="";qs("conFotoPreview").classList.add("hidden");qs("conActividadManualBox").classList.add("hidden");refreshAll();
+  }finally{isSavingConexa=false;btn.disabled=false;btn.textContent=prev;}
 }
 window.openConexaFor=function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;showView("conexas");qs("conexaEditId").value="";qs("conMiEmpresa").value=r.Empresa;qs("conFecha").value=r.Fecha;updateConRegistroOptions();qs("conRegistroPropio").value=r.ID;renderConexaOwnRecord();addConexaCompany();toast("Complete la coordinación con la empresa aledaña.")
@@ -781,11 +851,17 @@ window.openConexaFor=function(id){
 function renderConexasTable(){
   const emp=qs("filtroConEmpresa").value,inv=qs("filtroConEmpresaInvolucrada").value,d=qs("filtroConFecha").value||today();
   const cs=conexas.filter(c=>c.Fecha===d&&(!emp||c.MiEmpresa===emp)&&(!inv||(c.EmpresasConexas||[]).some(x=>x.empresa===inv)));
-  qs("tablaConexas").innerHTML=cs.map(c=>`<tr><td>${c.ID}</td><td>${c.RegistroID}</td><td>${c.MiEmpresa}</td><td>${(c.EmpresasConexas||[]).map(x=>x.empresa).join(", ")}</td><td>${c.HoraGestion}</td><td>${c.Actualizado||""}</td><td><button class="btn mini secondary" onclick="editConexa('${c.ID}')">Editar / incluir</button>${(c.Estado||"ACTIVO")!=="FINALIZADO"?`<button class="btn mini secondary" onclick="finalizarConexa('${c.ID}')">Finalizar</button>`:" <b>Finalizada</b>"}</td></tr>`).join("")||`<tr><td colspan="7">Sin coordinaciones.</td></tr>`
+  qs("tablaConexas").innerHTML=cs.map(c=>`<tr><td>${c.ID}</td><td>${c.RegistroID||"Actividad no TAR"}</td><td>${c.MiEmpresa}</td><td>${(c.EmpresasConexas||[]).map(x=>x.empresa).join(", ")}</td><td>${c.HoraGestion}</td><td>${c.Actualizado||""}</td><td><button class="btn mini secondary" onclick="editConexa('${c.ID}')">Editar / incluir</button>${(c.Estado||"ACTIVO")!=="FINALIZADO"?`<button class="btn mini secondary" onclick="finalizarConexa('${c.ID}')">Finalizar</button>`:" <b>Finalizada</b>"}</td></tr>`).join("")||`<tr><td colspan="7">Sin coordinaciones.</td></tr>`
 }
 window.editConexa=function(id){
-  const c=conexas.find(x=>x.ID===id),r=registros.find(x=>x.ID===c?.RegistroID);if(!c||!r)return;
-  showView("conexas");qs("conexaEditId").value=c.ID;qs("conMiEmpresa").value=c.MiEmpresa;qs("conFecha").value=c.Fecha;qs("conHora").value=nowTime();updateConRegistroOptions();qs("conRegistroPropio").value=c.RegistroID;qs("conJefePropio").value=c.JefePropio;qs("conSsomaPropio").value=c.SsomaPropio;qs("conObservaciones").value=c.Observaciones;qs("empresasConexas").innerHTML="";c.EmpresasConexas.forEach(addConexaCompany);pendingConexaPhoto="";qs("conFotoReunion").value="";qs("conFotoPreview").innerHTML="";qs("conFotoPreview").classList.add("hidden");renderConexaOwnRecord();toast("Edición cargada. Adjunte una nueva foto de reunión para guardar la actualización.")
+  const c=conexas.find(x=>x.ID===id);if(!c)return;
+  const isOther=(c.TipoActividadPropia==="OTRA_NO_TAR")||(!c.RegistroID&&c.ActividadPropiaManual);
+  const r=isOther?null:registros.find(x=>x.ID===c.RegistroID);if(!isOther&&!r)return;
+  showView("conexas");qs("conexaEditId").value=c.ID;qs("conMiEmpresa").value=c.MiEmpresa;qs("conFecha").value=c.Fecha;qs("conHora").value=nowTime();updateConRegistroOptions();
+  qs("conRegistroPropio").value=isOther?"__OTRA__":c.RegistroID;qs("conActividadManual").value=c.ActividadPropiaManual||"";qs("conLugarManual").value=c.Lugar||"";
+  qs("conJefePropio").value=c.JefePropio;qs("conSsomaPropio").value=c.SsomaPropio;qs("conObservaciones").value=c.Observaciones;qs("empresasConexas").innerHTML="";c.EmpresasConexas.forEach(addConexaCompany);pendingConexaPhoto="";qs("conFotoReunion").value="";qs("conFotoPreview").innerHTML="";qs("conFotoPreview").classList.add("hidden");renderConexaOwnRecord();
+  if(isOther){const l=DATA.lugares.find(x=>x.nombre===c.Lugar);if(l)positionMarker(qs("conexaMarker"),l.x,l.y,l.nombre)}
+  toast("Edición cargada. Adjunte una nueva foto de reunión para guardar la actualización.")
 }
 window.finalizarConexa=async function(id){
   const c=conexas.find(x=>x.ID===id);if(!c)return;
@@ -831,6 +907,7 @@ function renderMapGeneral(){
       </button>`;
     }).join("");
 
+  renderEmergencyDashboardCharts(rs);
   if(selectedSector)selectSector(selectedSector,false);
 }
 window.selectSector=function(nombre,scroll=true){
@@ -844,32 +921,25 @@ function listFilters(){
 }
 function renderListaDashboard(){
   const f=listFilters();let rs=registros.filter(r=>(!f.e||r.Empresa===f.e)&&(!f.l||r.Lugar===f.l)&&(!f.a||r.AreaUsuaria===f.a)&&(!f.d||r.Fecha===f.d));
-  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${r.AreaUsuaria}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).join(", ")}</td><td>${arr(r.RiesgosCriticos).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(emergencyComplianceStatsFromRecord(r).pct)}">${emergencyComplianceStatsFromRecord(r).pct}%</span></td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`;
-  const ids=new Set(rs.map(r=>r.ID));let cs=conexas.filter(c=>(!f.d||c.Fecha===f.d)&&(!f.l||c.Lugar===f.l)&&(!f.e||c.MiEmpresa===f.e)&&(!f.a||ids.has(c.RegistroID)));
-  qs("tablaListaConexas").innerHTML=cs.flatMap(c=>c.EmpresasConexas.map(x=>`<tr><td>${c.ID}</td><td>${c.Fecha}</td><td>${c.MiEmpresa}</td><td>${c.Lugar}</td><td>${x.empresa}</td><td>${x.actividad}</td><td>${x.riesgos.join(", ")}</td><td>${c.HoraGestion}</td></tr>`)).join("")||`<tr><td colspan="8">Sin registros conexos.</td></tr>`;
+  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.AreaUsuaria||"")}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}</td><td class="desc-cell">${escapeHtml(r.Descripcion||"")}</td><td>${arr(r.RiesgosCriticos).map(escapeHtml).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(emergencyComplianceStatsFromRecord(r).pct)}">${emergencyComplianceStatsFromRecord(r).pct}%</span></td><td class="missing-cell">${escapeHtml(missingEmergencyText(r))}</td></tr>`).join("")||`<tr><td colspan="11">Sin registros.</td></tr>`;
+  const ids=new Set(rs.map(r=>r.ID));let cs=conexas.filter(c=>(!f.d||c.Fecha===f.d)&&(!f.l||c.Lugar===f.l)&&(!f.e||c.MiEmpresa===f.e)&&(!f.a||!c.RegistroID||ids.has(c.RegistroID)));
+  qs("tablaListaConexas").innerHTML=cs.flatMap(c=>c.EmpresasConexas.map(x=>`<tr><td>${c.ID}</td><td>${c.Fecha}</td><td>${escapeHtml(c.MiEmpresa)}</td><td>${escapeHtml(c.Lugar)}</td><td>${escapeHtml(x.empresa)}</td><td>${escapeHtml(x.actividad)}</td><td>${arr(x.riesgos).map(escapeHtml).join(", ")}</td><td>${c.HoraGestion}</td></tr>`)).join("")||`<tr><td colspan="8">Sin registros conexos.</td></tr>`;
   qs("dashSectorTitle").textContent=f.l?`Dashboard – ${f.l}`:"Dashboard general";
   drawChart("chartSectorCriticos",countFlat(rs,"TrabajoCritico"),"doughnut");
-  const byEmp={};rs.forEach(r=>byEmp[r.Empresa]=(byEmp[r.Empresa]||0)+Number(r.NTrabajadores||0));drawChart("chartSectorEmpresa",byEmp,"bar")
-
+  const byEmp={};rs.forEach(r=>byEmp[r.Empresa]=(byEmp[r.Empresa]||0)+Number(r.NTrabajadores||0));drawChart("chartSectorEmpresa",byEmp,"bar");
+  renderEmergencyDashboardCharts(rs);
+  const missing=countMissingEmergencyControls(rs);drawChart("chartControlesFaltantes",missing,"bar",{datasetLabel:"Registros con brecha"});
+  const rows=[];rs.forEach(r=>{const m=missingEmergencyControlsFromRecord(r);if(m.length){const by={};m.forEach(x=>(by[x.work]||(by[x.work]=[])).push(x.control));Object.entries(by).forEach(([work,controls])=>rows.push(`<tr><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(work)}</td><td>${escapeHtml([...new Set(controls)].join(", "))}</td></tr>`))}});
+  qs("tablaBrechasEmergencia").innerHTML=rows.join("")||`<tr><td colspan="3">Sin brechas para los filtros seleccionados.</td></tr>`;
+}
+function renderEmergencyDashboardCharts(rs){
   const byEmpresa={};
-  rs.forEach(r=>{
-    const s=emergencyComplianceStatsFromRecord(r);
-    if(!byEmpresa[r.Empresa])byEmpresa[r.Empresa]={req:0,imp:0};
-    byEmpresa[r.Empresa].req+=s.required;byEmpresa[r.Empresa].imp+=s.implemented;
-  });
+  rs.forEach(r=>{const st=emergencyComplianceStatsFromRecord(r);if(!byEmpresa[r.Empresa])byEmpresa[r.Empresa]={req:0,imp:0};byEmpresa[r.Empresa].req+=st.required;byEmpresa[r.Empresa].imp+=st.implemented;});
   const cumplimientoEmpresa=Object.fromEntries(Object.entries(byEmpresa).map(([e,v])=>[e,v.req?Math.round(v.imp/v.req*100):0]));
   drawChart("chartCumplimientoEmpresa",cumplimientoEmpresa,"bar");
-
   const rangos={"0–49%":0,"50–74%":0,"75–99%":0,"100%":0};
-  rs.forEach(r=>{
-    const pct=emergencyComplianceStatsFromRecord(r).pct;
-    const rg=complianceRange(pct);
-    if(rg==="0-49")rangos["0–49%"]++;
-    if(rg==="50-74")rangos["50–74%"]++;
-    if(rg==="75-99")rangos["75–99%"]++;
-    if(rg==="100")rangos["100%"]++;
-  });
-  drawChart("chartRangosCumplimiento",rangos,"bar");
+  rs.forEach(r=>{const pct=emergencyComplianceStatsFromRecord(r).pct,rg=complianceRange(pct);if(rg==="0-49")rangos["0–49%"]++;if(rg==="50-74")rangos["50–74%"]++;if(rg==="75-99")rangos["75–99%"]++;if(rg==="100")rangos["100%"]++;});
+  drawChart("chartRangosCumplimiento",rangos,"bar",{horizontalOnMobile:false});
 }
 
 async function makeMapDetailImage(r){
@@ -898,7 +968,7 @@ async function buildPdfRegistro(r){
   qs("pdfContent").innerHTML=`<div class="pdf-content-grid">
   ${pdfField("Empresa",r.Empresa)}${pdfField("Área usuaria",r.AreaUsuaria)}${pdfField("Trabajo crítico",arr(r.TrabajoCritico).join(", "))}${pdfField("Lugar",r.Lugar)}
   ${pdfField("Fecha",r.Fecha)}${pdfField("Horario",`${r.HoraInicio} – ${r.HoraTermino}`)}${pdfField("Nº trabajadores",r.NTrabajadores)}${pdfField("Descripción del trabajo",r.Descripcion)}
-  ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}${pdfField("Controles de respuesta a emergencias",Object.entries(r.ControlesEmergencia||{}).map(([w,cs])=>`${w}: ${arr(cs).join(", ")}`).join(" | "))}${pdfField("% Cumplimiento respuesta a emergencias",(emergencyComplianceStatsFromRecord(r).pct)+"%")}
+  ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}${pdfField("Controles de respuesta a emergencias",Object.entries(r.ControlesEmergencia||{}).map(([w,cs])=>`${w}: ${arr(cs).join(", ")}`).join(" | "))}${pdfField("% Cumplimiento respuesta a emergencias",(emergencyComplianceStatsFromRecord(r).pct)+"%")}${emergencyComplianceStatsFromRecord(r).pct<100?pdfField("Controles de respuesta a emergencias NO implementados",missingEmergencyText(r)):""}
   </div>
   <h3 class="pdf-section-title">Detalle de ubicación</h3><div class="pdf-map-detail"><img src="${mapDetail}" alt="Detalle del plano"></div>`;
   return renderPdfAndDownload(`${r.ID}_Trabajo_Alto_Riesgo.pdf`)
@@ -1248,3 +1318,6 @@ document.addEventListener("visibilitychange",()=>{
 setInterval(()=>{ if(document.visibilityState==="visible") loadRemote(); },300000);
 
 document.addEventListener("DOMContentLoaded",init);
+
+// REV.11 – reconstrucción responsive de gráficos al cambiar orientación/tamaño.
+let __chartResizeTimer=null;window.addEventListener("resize",()=>{clearTimeout(__chartResizeTimer);__chartResizeTimer=setTimeout(()=>{const active=document.querySelector(".view.active")?.id;if(active==="view-inicio")renderResumen();if(active==="view-mapa")renderMapGeneral();if(active==="view-lista")renderListaDashboard();},180)});

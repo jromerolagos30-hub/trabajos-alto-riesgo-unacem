@@ -1,4 +1,14 @@
-<!DOCTYPE html>
+<!DOCTY
+          <label>Cumplimiento emergencia
+            <select id="filtroListaCumplimiento">
+              <option value="">Todos</option>
+              <option value="0-49">0–49% · Bajo</option>
+              <option value="50-74">50–74% · Parcial</option>
+              <option value="75-99">75–99% · Alto</option>
+              <option value="100">100% · Completo</option>
+            </select>
+          </label>
+PE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -195,7 +205,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Empresa</th><th>Lugar</th><th>Trabajo crítico</th><th>Horario</th><th>Trabajadores</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>ID</th><th>Empresa</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Horario</th><th>Trabajadores</th><th>Acciones</th></tr></thead>
           <tbody id="tablaMisRegistros"></tbody>
         </table>
       </div>
@@ -226,9 +236,22 @@
           </label>
         </div>
 
-        <label>Actividad propia reportada*
+        <label>Actividad propia*
           <select id="conRegistroPropio" required></select>
+          <small>Puede elegir una actividad de alto riesgo reportada o registrar una actividad no TAR.</small>
         </label>
+        <div id="conActividadManualBox" class="subcard hidden">
+          <strong>Actividad no registrada como trabajo de alto riesgo</strong>
+          <div class="form-grid cols-2 mt-10">
+            <label>Descripción de la actividad*
+              <textarea id="conActividadManual" rows="3" placeholder="Ej.: limpieza, traslado de materiales, inspección, orden y limpieza..."></textarea>
+            </label>
+            <label>Lugar / Sector*
+              <select id="conLugarManual"></select>
+            </label>
+          </div>
+          <small>Este registro quedará identificado como actividad no TAR en la pestaña Conexas.</small>
+        </div>
         <div id="conActividadResumen" class="activity-own-summary hidden"></div>
 
         <div class="subcard">
@@ -358,11 +381,11 @@
       <div class="dashboard-grid emergency-dashboard-grid">
         <article class="card">
           <h2>Cumplimiento de emergencia por empresa</h2>
-          <canvas id="chartCumplimientoEmpresa"></canvas>
+          <div class="chart-scroll"><canvas id="chartCumplimientoEmpresa"></canvas></div>
         </article>
         <article class="card">
           <h2>Actividades por rango de cumplimiento</h2>
-          <canvas id="chartRangosCumplimiento"></canvas>
+          <div class="chart-scroll"><canvas id="chartRangosCumplimiento"></canvas></div>
         </article>
       </div>
 </section>
@@ -388,7 +411,7 @@
       <div class="card-head"><h2>Registros de actividades de alto riesgo</h2></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Fecha</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Trabajo crítico</th><th>Riesgos críticos</th><th>Trabajadores</th><th>% Cumplimiento emergencia</th></tr></thead>
+          <thead><tr><th>ID</th><th>Fecha</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Riesgos críticos</th><th>Trabajadores</th><th>% Cumplimiento emergencia</th><th>Controles de emergencia no implementados</th></tr></thead>
           <tbody id="tablaRegistros"></tbody>
         </table>
       </div>
@@ -405,15 +428,28 @@
     </article>
 
     <div class="grid two">
-      <article class="card">
+      <article class="card chart-card">
         <div class="card-head"><h2 id="dashSectorTitle">Dashboard general</h2></div>
-        <canvas id="chartSectorCriticos" height="210"></canvas>
+        <div class="chart-scroll"><canvas id="chartSectorCriticos"></canvas></div>
       </article>
-      <article class="card">
+      <article class="card chart-card">
         <div class="card-head"><h2>Trabajadores por empresa</h2></div>
-        <canvas id="chartSectorEmpresa" height="210"></canvas>
+        <div class="chart-scroll"><canvas id="chartSectorEmpresa"></canvas></div>
       </article>
     </div>
+
+    <article class="card chart-card">
+      <div class="card-head">
+        <div><h2>Controles de emergencia no implementados</h2><small>Brechas detectadas según los filtros aplicados.</small></div>
+      </div>
+      <div class="chart-scroll chart-tall"><canvas id="chartControlesFaltantes"></canvas></div>
+      <div class="table-wrap mt-10">
+        <table class="compact-table">
+          <thead><tr><th>Empresa</th><th>Trabajo crítico</th><th>Controles faltantes</th></tr></thead>
+          <tbody id="tablaBrechasEmergencia"></tbody>
+        </table>
+      </div>
+    </article>
   </section>
 
   <!-- SECTORIZACIÓN -->
