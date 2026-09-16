@@ -141,7 +141,9 @@ let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || s
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
 let charts = {};
 let selectedSector = null;
-let sectorAdminUnlocked = sessionStorage.getItem("tar_sector_admin")==="1";
+// REV.12.1: el acceso a Sectorización vuelve a solicitar clave en cada carga de la app.
+let sectorAdminUnlocked = false;
+sessionStorage.removeItem("tar_sector_admin");
 let sectorMarking = false;
 let sectorDraftPoints = [];
 const FRENTES=["Planta Nueva","Planta Antigua"];
@@ -1149,18 +1151,32 @@ async function loadRemote(){
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
         return local?{...local,...l,rect:local?.rect}:l;
       });
-      userSectors=(res.data.sectores||[]).map(s=>({
+      // REV.12.1: conservar SIEMPRE la sectorización histórica de Planta Nueva
+      // incluida en la versión anterior. Los sectores guardados en Google Sheets
+      // se superponen por nombre/frente y Planta Antigua se agrega normalmente.
+      const legacyNueva=(DEFAULT_DATA.lugares||[]).map((s,i)=>({
+        id:`LEGACY-PN-${i+1}`,
+        nombre:s.nombre,
+        frente:"Planta Nueva",
+        x:Number(s.x||0),
+        y:Number(s.y||0),
+        rect:Array.isArray(s.rect)?s.rect.map(Number):[0,0,0,0],
+        actualizado:"Sectorización histórica"
+      }));
+      const remoteSectors=(res.data.sectores||[]).map(s=>({
         id:s.id||s.ID||"",
         nombre:s.nombre||s.Nombre||s.Sector||"",
         frente:normFrente(s.frente||s.Frente),
         x:Number(s.x||s.X||0),
         y:Number(s.y||s.Y||0),
-        rect:Array.isArray(s.rect)?s.rect:[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
+        rect:Array.isArray(s.rect)?s.rect.map(Number):[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
         actualizado:s.actualizado||s.Actualizado||""
-      })).filter(s=>s.nombre && s.rect.every(Number.isFinite));
-      if(userSectors.length){
-        DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
-      }
+      })).filter(s=>s.nombre && s.rect.every(Number.isFinite) && s.rect.some(v=>v!==0));
+      const merged=new Map();
+      legacyNueva.forEach(s=>merged.set(`${s.frente}||${s.nombre}`.toUpperCase(),s));
+      remoteSectors.forEach(s=>merged.set(`${s.frente}||${s.nombre}`.toUpperCase(),s));
+      userSectors=[...merged.values()];
+      DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
 
@@ -1213,7 +1229,6 @@ async function sectorLogin(){
   const pwd=qs("sectorPassword").value;
   if(pwd!=="2026Unacem"){toast("Clave incorrecta");return}
   sectorAdminUnlocked=true;
-  sessionStorage.setItem("tar_sector_admin","1");
   qs("sectorPassword").value="";
   renderSectorizacionAccess();
   toast("Acceso a sectorización habilitado");
