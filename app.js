@@ -1172,9 +1172,22 @@ async function loadRemote(){
         rect:Array.isArray(s.rect)?s.rect.map(Number):[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
         actualizado:s.actualizado||s.Actualizado||""
       })).filter(s=>s.nombre && s.rect.every(Number.isFinite) && s.rect.some(v=>v!==0));
+      // REV.12.2: Planta Nueva conserva EXACTAMENTE la geometría histórica del frontend.
+      // La migración V12 añadió Frente a Sheets, pero no debe reemplazar los rectángulos
+      // históricos de Planta Nueva con coordenadas reinterpretadas.
       const merged=new Map();
       legacyNueva.forEach(s=>merged.set(`${s.frente}||${s.nombre}`.toUpperCase(),s));
-      remoteSectors.forEach(s=>merged.set(`${s.frente}||${s.nombre}`.toUpperCase(),s));
+      remoteSectors.forEach(s=>{
+        const key=`${s.frente}||${s.nombre}`.toUpperCase();
+        const legacy=merged.get(key);
+        if(s.frente==="Planta Nueva" && legacy){
+          // Mantener x/y/rect originales; conservar solo el id/fecha remotos si existen.
+          merged.set(key,{...s,id:s.id||legacy.id,x:legacy.x,y:legacy.y,rect:[...legacy.rect],actualizado:s.actualizado||legacy.actualizado});
+        }else{
+          // Planta Antigua y sectores nuevos sí usan la geometría guardada en Sheets.
+          merged.set(key,s);
+        }
+      });
       userSectors=[...merged.values()];
       DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
       registros=res.data.registros?.length?res.data.registros:registros;
