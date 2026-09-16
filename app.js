@@ -1151,44 +1151,32 @@ async function loadRemote(){
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
         return local?{...local,...l,rect:local?.rect}:l;
       });
-      // REV.12.1: conservar SIEMPRE la sectorización histórica de Planta Nueva
-      // incluida en la versión anterior. Los sectores guardados en Google Sheets
-      // se superponen por nombre/frente y Planta Antigua se agrega normalmente.
-      const legacyNueva=(DEFAULT_DATA.lugares||[]).map((s,i)=>({
-        id:`LEGACY-PN-${i+1}`,
-        nombre:s.nombre,
-        frente:"Planta Nueva",
-        x:Number(s.x||0),
-        y:Number(s.y||0),
-        rect:Array.isArray(s.rect)?s.rect.map(Number):[0,0,0,0],
-        actualizado:"Sectorización histórica"
-      }));
+      // REV.12.3: restaurar la lógica histórica real de sectorización de Planta Nueva.
+      // La fuente de verdad vuelve a ser la pestaña Sectores/Sectorizacion de Google Sheets,
+      // exactamente como en la versión anterior que funcionaba correctamente.
+      // Los sectores antiguos sin campo Frente se interpretan como Planta Nueva.
       const remoteSectors=(res.data.sectores||[]).map(s=>({
         id:s.id||s.ID||"",
         nombre:s.nombre||s.Nombre||s.Sector||"",
-        frente:normFrente(s.frente||s.Frente),
+        frente:normFrente(s.frente||s.Frente||"Planta Nueva"),
         x:Number(s.x||s.X||0),
         y:Number(s.y||s.Y||0),
         rect:Array.isArray(s.rect)?s.rect.map(Number):[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
         actualizado:s.actualizado||s.Actualizado||""
       })).filter(s=>s.nombre && s.rect.every(Number.isFinite) && s.rect.some(v=>v!==0));
-      // REV.12.2: Planta Nueva conserva EXACTAMENTE la geometría histórica del frontend.
-      // La migración V12 añadió Frente a Sheets, pero no debe reemplazar los rectángulos
-      // históricos de Planta Nueva con coordenadas reinterpretadas.
-      const merged=new Map();
-      legacyNueva.forEach(s=>merged.set(`${s.frente}||${s.nombre}`.toUpperCase(),s));
-      remoteSectors.forEach(s=>{
-        const key=`${s.frente}||${s.nombre}`.toUpperCase();
-        const legacy=merged.get(key);
-        if(s.frente==="Planta Nueva" && legacy){
-          // Mantener x/y/rect originales; conservar solo el id/fecha remotos si existen.
-          merged.set(key,{...s,id:s.id||legacy.id,x:legacy.x,y:legacy.y,rect:[...legacy.rect],actualizado:s.actualizado||legacy.actualizado});
-        }else{
-          // Planta Antigua y sectores nuevos sí usan la geometría guardada en Sheets.
-          merged.set(key,s);
-        }
-      });
-      userSectors=[...merged.values()];
+
+      // No recalcular, no reinterpretar y no reemplazar las coordenadas históricas.
+      // Si Sheets devuelve la sectorización existente, se usa tal cual.
+      // El fallback DEFAULT_DATA solo se usa si el backend no devuelve sectores.
+      if(remoteSectors.length){
+        userSectors=remoteSectors;
+      }else{
+        userSectors=(DEFAULT_DATA.lugares||[]).map((s,i)=>({
+          id:`LEGACY-PN-${i+1}`,nombre:s.nombre,frente:"Planta Nueva",
+          x:Number(s.x||0),y:Number(s.y||0),rect:Array.isArray(s.rect)?s.rect.map(Number):[0,0,0,0],
+          actualizado:"Sectorización histórica local"
+        }));
+      }
       DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
