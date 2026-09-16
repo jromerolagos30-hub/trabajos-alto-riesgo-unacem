@@ -132,9 +132,6 @@
         </div>
 
         <div class="form-grid cols-2">
-          <label>Frente / Plano*
-            <select id="frente" required><option value="Planta Nueva">Planta Nueva</option><option value="Planta Antigua">Planta Antigua</option></select>
-          </label>
           <label>Lugar / Sector*
             <select id="lugar" required></select>
           </label>
@@ -169,13 +166,13 @@
       <article class="card map-card">
         <div class="card-head">
           <div>
-            <h2 id="registroMapTitle">Plano – Planta Nueva</h2>
+            <h2>Plano – Planta Nueva</h2>
             <small>Acerca el plano y haz clic exactamente sobre el nombre del lugar. La app solo seleccionará el sector si el punto cae dentro de su zona definida.</small>
           </div>
           <button class="btn mini secondary" id="btnResetMarker" type="button">Limpiar punto</button>
         </div>
         <div id="mapRegistro" class="plant-map interactive">
-          <img id="registroMapImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+          <img src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div class="map-marker hidden" id="registroMarker"><span></span></div>
         </div>
         <div class="legend">
@@ -197,7 +194,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Empresa</th><th>Frente</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Horario</th><th>Trabajadores</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>ID</th><th>Empresa</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Horario</th><th>Trabajadores</th><th>Acciones</th></tr></thead>
           <tbody id="tablaMisRegistros"></tbody>
         </table>
       </div>
@@ -316,7 +313,6 @@
         <p>Sectorización de la carga de trabajos de alto riesgo en tiempo diario.</p>
       </div>
       <div class="inline-fields compact map-filters">
-        <label>Frente <select id="mapFiltroFrente"><option value="Planta Nueva">Planta Nueva</option><option value="Planta Antigua">Planta Antigua</option></select></label>
         <label>Trabajo crítico <select id="mapFiltroTrabajo"><option value="">Todos</option></select></label>
         <label>Empresa <select id="mapFiltroEmpresa"><option value="">Todas</option></select></label>
         <label>Área usuaria <select id="mapFiltroArea"><option value="">Todas</option></select></label>
@@ -346,7 +342,7 @@
           </div>
         </div>
         <div id="mapGeneral" class="plant-map interactive overview">
-          <img id="mapGeneralImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+          <img src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div id="sectorMarkers"></div>
         </div>
       </article>
@@ -393,7 +389,6 @@
     </div>
 
     <div class="filters card">
-      <label>Frente <select id="listaFrente"><option value="">Todos</option><option value="Planta Nueva">Planta Nueva</option><option value="Planta Antigua">Planta Antigua</option></select></label>
       <label>Empresa <select id="listaEmpresa"><option value="">Todas</option></select></label>
       <label>Lugar <select id="listaLugar"><option value="">Todos</option></select></label>
       <label>Área usuaria <select id="listaArea"><option value="">Todas</option></select></label>
@@ -405,7 +400,7 @@
       <div class="card-head"><h2>Registros de actividades de alto riesgo</h2></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Fecha</th><th>Frente</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Riesgos críticos</th><th>Trabajadores</th><th>% Cumplimiento emergencia</th><th>Controles de emergencia no implementados</th></tr></thead>
+          <thead><tr><th>ID</th><th>Fecha</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Riesgos críticos</th><th>Trabajadores</th><th>% Cumplimiento emergencia</th><th>Controles de emergencia no implementados</th></tr></thead>
           <tbody id="tablaRegistros"></tbody>
         </table>
       </div>
@@ -465,8 +460,6 @@
       <div class="page-head">
         <div>
           <h1>Sectorización</h1>
-          <p>Seleccione Planta Nueva o Planta Antigua y defina independientemente los sectores de cada plano.</p>
-          <label class="sector-front-select">Frente / Plano <select id="sectorFrente"><option value="Planta Nueva">Planta Nueva</option><option value="Planta Antigua">Planta Antigua</option></select></label>
           <p>Empieza desde cero: acerca el plano, define manualmente cada zona y asigna el título exacto del sector.</p>
         </div>
         <button class="btn secondary" id="btnSectorLogout">Cerrar sectorización</button>
@@ -525,7 +518,7 @@
             </div>
           </div>
           <div id="mapSectorizacion" class="plant-map interactive sector-config-map">
-            <img id="sectorMapImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+            <img src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
             <div id="sectorZoneLayer"></div>
             <div id="sectorDraftZone" class="sector-draft-zone hidden"></div>
           </div>
@@ -543,7 +536,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Frente</th><th>Sector</th><th>Actualizado</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Sector</th><th>Actualizado</th><th>Acciones</th></tr></thead>
             <tbody id="tablaSectoresConfig"></tbody>
           </table>
         </div>

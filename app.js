@@ -141,24 +141,9 @@ let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || s
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
 let charts = {};
 let selectedSector = null;
-// REV.12.1: el acceso a Sectorización vuelve a solicitar clave en cada carga de la app.
-let sectorAdminUnlocked = false;
-sessionStorage.removeItem("tar_sector_admin");
+let sectorAdminUnlocked = sessionStorage.getItem("tar_sector_admin")==="1";
 let sectorMarking = false;
 let sectorDraftPoints = [];
-const FRENTES=["Planta Nueva","Planta Antigua"];
-function normFrente(v){return String(v||"Planta Nueva").toLowerCase().includes("antigua")?"Planta Antigua":"Planta Nueva"}
-function mapAsset(frente){return normFrente(frente)==="Planta Antigua"?"mapa_planta_antigua.jpg":"mapa_planta_nueva.png"}
-function sectorsFor(frente){const f=normFrente(frente);return (userSectors||[]).filter(s=>normFrente(s.frente)===f)}
-function updateMapForFrente(context){
-  const f=context==="registro"?normFrente(qs("frente")?.value):context==="mapa"?normFrente(qs("mapFiltroFrente")?.value):normFrente(qs("sectorFrente")?.value);
-  const img=qs(context==="registro"?"registroMapImg":context==="mapa"?"mapGeneralImg":"sectorMapImg");if(img){img.src=mapAsset(f);img.alt=`Mapa de evacuación ${f}`}
-  if(context==="registro"){
-    qs("registroMapTitle").textContent=`Plano – ${f}`;const ls=sectorsFor(f);setOptions("lugar",ls.map(x=>x.nombre),"Seleccione");clearMarker();
-  }
-  if(context==="mapa"){selectedSector=null;qs("sectorEmpty")?.classList.remove("hidden");qs("sectorDetail")?.classList.add("hidden");renderMapGeneral()}
-  if(context==="sectorizacion"){clearSectorDraft();resetSectorEditor();renderSectorZones();renderSectorConfigTable()}
-}
 let userSectors = [];
 let pendingConexaPhoto = "";
 let isSavingRegistro = false;
@@ -185,7 +170,7 @@ function isActive(r){return (r.EstadoOperativo||"ACTIVO")!=="FINALIZADO"}
 
 function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
-  qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("frente").value="Planta Nueva"; qs("mapFiltroFrente").value="Planta Nueva"; qs("sectorFrente").value="Planta Nueva"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
+  qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
   wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion(); renderConfig(); refreshAll(); renderEmergencyControls();
   loadRemote();
 }
@@ -211,7 +196,7 @@ function wireEvents(){
   qs("trabajosCriticos").addEventListener("change",renderEmergencyControls);
   qs("emergencyControlsContainer").addEventListener("change",updateRegistroEmergencyPercent);
   qs("btnGuardarBorrador").onclick=saveDraft;
-  qs("lugar").onchange=()=>setMarkerByLugar(qs("lugar").value); qs("frente").onchange=()=>updateMapForFrente("registro");
+  qs("lugar").onchange=()=>setMarkerByLugar(qs("lugar").value);
   qs("mapRegistro").onclick=mapRegistroClick;
   qs("btnElegirMapa").onclick=()=>{qs("mapRegistro").scrollIntoView({behavior:"smooth",block:"center"});toast("Acerca el plano y haz clic exactamente sobre el nombre del lugar")};
   qs("btnResetMarker").onclick=clearMarker;
@@ -226,11 +211,11 @@ function wireEvents(){
   qs("formConexa").onsubmit=submitConexa;
   qs("filtroConEmpresa").onchange=renderConexasTable; qs("filtroConEmpresaInvolucrada").onchange=renderConexasTable; qs("filtroConFecha").onchange=renderConexasTable;
 
-  ["mapFiltroTrabajo","mapFiltroEmpresa","mapFiltroArea","mapFiltroFecha"].forEach(id=>qs(id).onchange=renderMapGeneral); qs("mapFiltroFrente").onchange=()=>updateMapForFrente("mapa");
+  ["mapFiltroTrabajo","mapFiltroEmpresa","mapFiltroArea","mapFiltroFecha"].forEach(id=>qs(id).onchange=renderMapGeneral);
   qs("btnSectorDashboard").onclick=()=>{showView("lista"); if(selectedSector){qs("listaLugar").value=selectedSector;renderListaDashboard()}};
 
-  ["listaFrente","listaEmpresa","listaLugar","listaArea","listaFecha"].forEach(id=>qs(id).onchange=renderListaDashboard);
-  qs("btnLimpiarFiltros").onclick=()=>{qs("listaFrente").value="";qs("listaEmpresa").value="";qs("listaLugar").value="";qs("listaArea").value="";qs("listaFecha").value=today();renderListaDashboard()};
+  ["listaEmpresa","listaLugar","listaArea","listaFecha"].forEach(id=>qs(id).onchange=renderListaDashboard);
+  qs("btnLimpiarFiltros").onclick=()=>{qs("listaEmpresa").value="";qs("listaLugar").value="";qs("listaArea").value="";qs("listaFecha").value=today();renderListaDashboard()};
 }
 
 function renderConfig(){
@@ -260,7 +245,7 @@ function populateAllSelects(){
   setOptions("areaUsuaria",DATA.areas,"Seleccione");
   setOptions("mapFiltroArea",DATA.areas,"Todas");setOptions("listaArea",DATA.areas,"Todas");
 
-  setOptions("lugar",sectorsFor(qs("frente")?.value||"Planta Nueva").map(x=>x.nombre),"Seleccione");
+  setOptions("lugar",DATA.lugares.map(x=>x.nombre),"Seleccione");
   setOptions("listaLugar",DATA.lugares.map(x=>x.nombre),"Todos");
 
   setOptions("mapFiltroTrabajo",DATA.trabajos,"Todos");
@@ -413,7 +398,7 @@ function pointInRect(x,y,rect){
 }
 function findZoneAt(x,y){
   // V4.1: solo reconoce sectores creados manualmente en la interfaz Sectorización.
-  const source=sectorsFor(qs("frente")?.value||"Planta Nueva");
+  const source=userSectors||[];
   const matches=source.filter(l=>pointInRect(x,y,l.rect));
   if(!matches.length) return null;
   matches.sort((a,b)=>{
@@ -424,7 +409,7 @@ function findZoneAt(x,y){
   return matches[0];
 }
 function setMarkerByLugar(nombre){
-  const l=sectorsFor(qs("frente")?.value||"Planta Nueva").find(x=>x.nombre===nombre); if(!l)return;
+  const l=DATA.lugares.find(x=>x.nombre===nombre); if(!l)return;
   qs("mapX").value=l.x; qs("mapY").value=l.y;
   positionMarker(qs("registroMarker"),l.x,l.y,nombre);
   qs("mapCoordText").textContent=`Lugar identificado en el plano: ${nombre}`;
@@ -639,7 +624,7 @@ async function submitRegistro(e){
   if(!qs("mapX").value || !qs("mapY").value)return toast("Seleccione la ubicación en el plano");
   const existing=qs("registroId").value;
   const r={
-    ID:existing||uid("R"),Frente:normFrente(qs("frente").value),Empresa:qs("empresa").value,AreaUsuaria:qs("areaUsuaria").value,TrabajoCritico:tc,Lugar:qs("lugar").value,
+    ID:existing||uid("R"),Empresa:qs("empresa").value,AreaUsuaria:qs("areaUsuaria").value,TrabajoCritico:tc,Lugar:qs("lugar").value,
     Fecha:qs("fecha").value,HoraInicio:qs("horaInicio").value,HoraTermino:qs("horaTermino").value,NTrabajadores:Number(qs("nTrabajadores").value),
     Descripcion:qs("descripcion").value,RiesgosCriticos:rc,ControlesEmergencia:selectedEmergencyControls(),ControlesEmergenciaFaltantes:missingEmergencyControlsFromSelection(),NControlesEmergenciaRequeridos:emergencyComplianceStatsFromSelection().required,NControlesEmergenciaImplementados:emergencyComplianceStatsFromSelection().implemented,PorcentajeCumplimientoEmergencia:emergencyComplianceStatsFromSelection().pct,Conexas:"NO",EstadoOperativo:"ACTIVO",
     X:Number(qs("mapX").value),Y:Number(qs("mapY").value),Actualizado:new Date().toISOString()
@@ -673,11 +658,11 @@ function resetRegistroForm(){
 function renderMisRegistros(){
   const emp=qs("filtroMisEmpresa").value, d=qs("filtroMisFecha").value||today();
   const rs=registros.filter(r=>r.Fecha===d && (!emp||r.Empresa===emp));
-  qs("tablaMisRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(normFrente(r.Frente))}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}</td><td class="desc-cell">${escapeHtml(r.Descripcion||"")}</td><td>${r.HoraInicio}–${r.HoraTermino}</td><td>${r.NTrabajadores}</td>
-  <td><button class="btn mini secondary" onclick="editRegistro('${r.ID}')">Editar</button><button class="btn mini secondary" onclick="openConexaFor('${r.ID}')">Conexa</button>${isActive(r)?`<button class="btn mini secondary" onclick="finalizarRegistro('${r.ID}')">Finalizar</button>`:"<b>Finalizado</b>"}<button class="btn mini secondary" onclick="continuarRegistro('${r.ID}')">Continuar mañana</button></td></tr>`).join("")||`<tr><td colspan="9">Sin registros.</td></tr>`
+  qs("tablaMisRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}</td><td class="desc-cell">${escapeHtml(r.Descripcion||"")}</td><td>${r.HoraInicio}–${r.HoraTermino}</td><td>${r.NTrabajadores}</td>
+  <td><button class="btn mini secondary" onclick="editRegistro('${r.ID}')">Editar</button><button class="btn mini secondary" onclick="openConexaFor('${r.ID}')">Conexa</button>${isActive(r)?`<button class="btn mini secondary" onclick="finalizarRegistro('${r.ID}')">Finalizar</button>`:"<b>Finalizado</b>"}<button class="btn mini secondary" onclick="continuarRegistro('${r.ID}')">Continuar mañana</button></td></tr>`).join("")||`<tr><td colspan="8">Sin registros.</td></tr>`
 }
 window.editRegistro=function(id){
-  const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("frente").value=normFrente(r.Frente);updateMapForFrente("registro");qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;window.scrollTo({top:0,behavior:"smooth"})
+  const r=registros.find(x=>x.ID===id);if(!r)return;showView("registro");qs("registroId").value=r.ID;qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=r.Fecha;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;window.scrollTo({top:0,behavior:"smooth"})
 }
 window.finalizarRegistro=async function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;
@@ -686,7 +671,7 @@ window.finalizarRegistro=async function(id){
 }
 window.continuarRegistro=function(id){
   const r=registros.find(x=>x.ID===id);if(!r)return;const d=new Date(r.Fecha+"T12:00:00");d.setDate(d.getDate()+1);const next=d.toISOString().slice(0,10);
-  showView("registro");qs("registroId").value="";qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("frente").value=normFrente(r.Frente);updateMapForFrente("registro");qs("lugar").value=r.Lugar;qs("fecha").value=next;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;toast("Actividad copiada. Revise y actualice antes de registrar.")
+  showView("registro");qs("registroId").value="";qs("empresa").value=r.Empresa;qs("areaUsuaria").value=r.AreaUsuaria;qs("lugar").value=r.Lugar;qs("fecha").value=next;qs("horaInicio").value=r.HoraInicio;qs("horaTermino").value=r.HoraTermino;qs("nTrabajadores").value=r.NTrabajadores;qs("descripcion").value=r.Descripcion;setMulti("trabajosCriticos",arr(r.TrabajoCritico));setMulti("riesgosCriticos",arr(r.RiesgosCriticos));setEmergencyControls(r.ControlesEmergencia||{});qs("mapX").value=r.X;qs("mapY").value=r.Y;positionMarker(qs("registroMarker"),r.X,r.Y,r.Lugar);qs("mapCoordText").textContent=`Lugar identificado en el plano: ${r.Lugar}`;toast("Actividad copiada. Revise y actualice antes de registrar.")
 }
 function openContinue(){qs("continueModal").classList.remove("hidden");renderContinueTable()}
 function renderContinueTable(){
@@ -886,8 +871,8 @@ window.finalizarConexa=async function(id){
 }
 
 function filteredForMap(){
-  const d=qs("mapFiltroFecha").value||today(),t=qs("mapFiltroTrabajo").value,e=qs("mapFiltroEmpresa").value,a=qs("mapFiltroArea").value,f=normFrente(qs("mapFiltroFrente")?.value);
-  return registros.filter(r=>r.Fecha===d&&normFrente(r.Frente)===f&&isActive(r)&&(!t||arr(r.TrabajoCritico).includes(t))&&(!e||r.Empresa===e)&&(!a||r.AreaUsuaria===a))
+  const d=qs("mapFiltroFecha").value||today(),t=qs("mapFiltroTrabajo").value,e=qs("mapFiltroEmpresa").value,a=qs("mapFiltroArea").value;
+  return registros.filter(r=>r.Fecha===d&&isActive(r)&&(!t||arr(r.TrabajoCritico).includes(t))&&(!e||r.Empresa===e)&&(!a||r.AreaUsuaria===a))
 }
 function normalizeSectorKey(v){
   return String(v||"")
@@ -908,7 +893,7 @@ function renderMapGeneral(){
 
   // Usar sectorización guardada. Si por alguna razón aún no cargó userSectors,
   // usar DATA.lugares que también proviene del bootstrap.
-  const sectors=sectorsFor(qs("mapFiltroFrente")?.value||"Planta Nueva");
+  const sectors=(userSectors&&userSectors.length)?userSectors:(DATA.lugares||[]);
   qs("sectorMarkers").innerHTML=sectors
     .map(l=>{
       const key=normalizeSectorKey(l.nombre);
@@ -932,11 +917,11 @@ window.selectSector=function(nombre,scroll=true){
 }
 
 function listFilters(){
-  return {f:qs("listaFrente").value,e:qs("listaEmpresa").value,l:qs("listaLugar").value,a:qs("listaArea").value,d:qs("listaFecha").value}
+  return {e:qs("listaEmpresa").value,l:qs("listaLugar").value,a:qs("listaArea").value,d:qs("listaFecha").value}
 }
 function renderListaDashboard(){
-  const f=listFilters();let rs=registros.filter(r=>(!f.f||normFrente(r.Frente)===f.f)&&(!f.e||r.Empresa===f.e)&&(!f.l||r.Lugar===f.l)&&(!f.a||r.AreaUsuaria===f.a)&&(!f.d||r.Fecha===f.d));
-  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(normFrente(r.Frente))}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.AreaUsuaria||"")}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}</td><td class="desc-cell">${escapeHtml(r.Descripcion||"")}</td><td>${arr(r.RiesgosCriticos).map(escapeHtml).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(emergencyComplianceStatsFromRecord(r).pct)}">${emergencyComplianceStatsFromRecord(r).pct}%</span></td><td class="missing-cell">${escapeHtml(missingEmergencyText(r))}</td></tr>`).join("")||`<tr><td colspan="12">Sin registros.</td></tr>`;
+  const f=listFilters();let rs=registros.filter(r=>(!f.e||r.Empresa===f.e)&&(!f.l||r.Lugar===f.l)&&(!f.a||r.AreaUsuaria===f.a)&&(!f.d||r.Fecha===f.d));
+  qs("tablaRegistros").innerHTML=rs.map(r=>`<tr><td>${r.ID}</td><td>${r.Fecha}</td><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.AreaUsuaria||"")}</td><td>${escapeHtml(r.Lugar)}</td><td>${arr(r.TrabajoCritico).map(escapeHtml).join(", ")}</td><td class="desc-cell">${escapeHtml(r.Descripcion||"")}</td><td>${arr(r.RiesgosCriticos).map(escapeHtml).join(", ")}</td><td>${r.NTrabajadores}</td><td><span class="compliance-badge ${complianceBadgeClass(emergencyComplianceStatsFromRecord(r).pct)}">${emergencyComplianceStatsFromRecord(r).pct}%</span></td><td class="missing-cell">${escapeHtml(missingEmergencyText(r))}</td></tr>`).join("")||`<tr><td colspan="11">Sin registros.</td></tr>`;
   const ids=new Set(rs.map(r=>r.ID));let cs=conexas.filter(c=>(!f.d||c.Fecha===f.d)&&(!f.l||c.Lugar===f.l)&&(!f.e||c.MiEmpresa===f.e)&&(!f.a||!c.RegistroID||ids.has(c.RegistroID)));
   qs("tablaListaConexas").innerHTML=cs.flatMap(c=>c.EmpresasConexas.map(x=>`<tr><td>${c.ID}</td><td>${c.Fecha}</td><td>${escapeHtml(c.MiEmpresa)}</td><td>${escapeHtml(c.Lugar)}</td><td>${escapeHtml(x.empresa)}</td><td>${escapeHtml(x.actividad)}</td><td>${arr(x.riesgos).map(escapeHtml).join(", ")}</td><td>${c.HoraGestion}</td></tr>`)).join("")||`<tr><td colspan="8">Sin registros conexos.</td></tr>`;
   qs("dashSectorTitle").textContent=f.l?`Dashboard – ${f.l}`:"Dashboard general";
@@ -958,7 +943,7 @@ function renderEmergencyDashboardCharts(rs){
 }
 
 async function makeMapDetailImage(r){
-  const img=await loadImage(mapAsset(r.Frente));
+  const img=await loadImage("mapa_planta_nueva.png");
   const sx=Math.max(0,Math.round((Number(r.X)/100)*img.naturalWidth-img.naturalWidth*.18));
   const sy=Math.max(0,Math.round((Number(r.Y)/100)*img.naturalHeight-img.naturalHeight*.14));
   const sw=Math.min(Math.round(img.naturalWidth*.36),img.naturalWidth-sx);
@@ -981,7 +966,7 @@ async function buildPdfRegistro(r){
   const mapDetail=await makeMapDetailImage(r);
   qs("pdfTitle").textContent="REGISTRO DE TRABAJO DE ALTO RIESGO";qs("pdfSubtitle").textContent=`ID ${r.ID} · ${r.Fecha}`;
   qs("pdfContent").innerHTML=`<div class="pdf-content-grid">
-  ${pdfField("Empresa",r.Empresa)}${pdfField("Frente / Plano",normFrente(r.Frente))}${pdfField("Área usuaria",r.AreaUsuaria)}${pdfField("Trabajo crítico",arr(r.TrabajoCritico).join(", "))}${pdfField("Lugar",r.Lugar)}
+  ${pdfField("Empresa",r.Empresa)}${pdfField("Área usuaria",r.AreaUsuaria)}${pdfField("Trabajo crítico",arr(r.TrabajoCritico).join(", "))}${pdfField("Lugar",r.Lugar)}
   ${pdfField("Fecha",r.Fecha)}${pdfField("Horario",`${r.HoraInicio} – ${r.HoraTermino}`)}${pdfField("Nº trabajadores",r.NTrabajadores)}${pdfField("Descripción del trabajo",r.Descripcion)}
   ${pdfField("Riesgos críticos",arr(r.RiesgosCriticos).join(", "))}${pdfField("Controles de respuesta a emergencias",Object.entries(r.ControlesEmergencia||{}).map(([w,cs])=>`${w}: ${arr(cs).join(", ")}`).join(" | "))}${pdfField("% Cumplimiento respuesta a emergencias",(emergencyComplianceStatsFromRecord(r).pct)+"%")}${emergencyComplianceStatsFromRecord(r).pct<100?pdfField("Controles de respuesta a emergencias NO implementados",missingEmergencyText(r)):""}
   </div>
@@ -1151,38 +1136,17 @@ async function loadRemote(){
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
         return local?{...local,...l,rect:local?.rect}:l;
       });
-      // REV.12.4: restauración exacta de la sectorización histórica de Planta Nueva.
-      // Los sectores históricos de Planta Nueva conservan SIEMPRE las coordenadas/rectángulos
-      // de la versión V11.1 que funcionaba correctamente. Esto evita que coordenadas desplazadas
-      // guardadas durante las pruebas V12.x vuelvan a mover las zonas.
-      // Planta Antigua continúa usando sus sectores independientes guardados en Google Sheets.
-      const remoteSectors=(res.data.sectores||[]).map(s=>({
+      userSectors=(res.data.sectores||[]).map(s=>({
         id:s.id||s.ID||"",
         nombre:s.nombre||s.Nombre||s.Sector||"",
-        frente:normFrente(s.frente||s.Frente||"Planta Nueva"),
         x:Number(s.x||s.X||0),
         y:Number(s.y||s.Y||0),
-        rect:Array.isArray(s.rect)?s.rect.map(Number):[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
+        rect:Array.isArray(s.rect)?s.rect:[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
         actualizado:s.actualizado||s.Actualizado||""
       })).filter(s=>s.nombre && s.rect.every(Number.isFinite));
-
-      const histPN=(DEFAULT_DATA.lugares||[]).map((s,i)=>({
-        id:`LEGACY-PN-${i+1}`,
-        nombre:s.nombre,
-        frente:"Planta Nueva",
-        x:Number(s.x||0),
-        y:Number(s.y||0),
-        rect:Array.isArray(s.rect)?s.rect.map(Number):[0,0,0,0],
-        actualizado:"Sectorización histórica V11.1"
-      }));
-
-      // Mantener también cualquier sector adicional de Planta Nueva que no existía en V11.1,
-      // pero nunca reemplazar las coordenadas históricas de los sectores ya conocidos.
-      const histNames=new Set(histPN.map(s=>String(s.nombre||"").trim().toUpperCase()));
-      const extraPN=remoteSectors.filter(s=>s.frente==="Planta Nueva" && !histNames.has(String(s.nombre||"").trim().toUpperCase()));
-      const antigua=remoteSectors.filter(s=>s.frente==="Planta Antigua");
-      userSectors=[...histPN,...extraPN,...antigua];
-      DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
+      if(userSectors.length){
+        DATA.lugares=userSectors.map(s=>({nombre:s.nombre,x:s.x,y:s.y,rect:s.rect}));
+      }
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
 
@@ -1192,7 +1156,6 @@ async function loadRemote(){
       renderEmergencyControls();
 
       persist();
-      updateMapForFrente("registro");updateMapForFrente("mapa");
       refreshAll();
     }
   }catch(e){
@@ -1220,7 +1183,7 @@ function setupSectorizacion(){
   qs("btnClearZone").onclick=clearSectorDraft;
   qs("btnCancelSectorEdit").onclick=resetSectorEditor;
   qs("btnSaveSector").onclick=saveSectorConfig;
-  qs("sectorSearch").oninput=renderSectorConfigTable; qs("sectorFrente").onchange=()=>updateMapForFrente("sectorizacion");
+  qs("sectorSearch").oninput=renderSectorConfigTable;
   map.addEventListener("click",sectorMapClick);
 }
 function renderSectorizacionAccess(){
@@ -1235,6 +1198,7 @@ async function sectorLogin(){
   const pwd=qs("sectorPassword").value;
   if(pwd!=="2026Unacem"){toast("Clave incorrecta");return}
   sectorAdminUnlocked=true;
+  sessionStorage.setItem("tar_sector_admin","1");
   qs("sectorPassword").value="";
   renderSectorizacionAccess();
   toast("Acceso a sectorización habilitado");
@@ -1286,7 +1250,6 @@ async function saveSectorConfig(){
   const sector={
     id:qs("sectorEditId").value||uid("S"),
     nombre,
-    frente:normFrente(qs("sectorFrente").value),
     x:Number(((rect[0]+rect[2])/2).toFixed(3)),
     y:Number(((rect[1]+rect[3])/2).toFixed(3)),
     rect:rect.map(v=>Number(v.toFixed(3))),
@@ -1300,13 +1263,13 @@ async function saveSectorConfig(){
     const ok=await postRemote({action:"saveSector",password:"2026Unacem",sector});
     if(!ok){toast("Sector guardado localmente; revise conexión con Apps Script")}
   }
-  DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
+  DATA.lugares=userSectors.map(s=>({nombre:s.nombre,x:s.x,y:s.y,rect:s.rect}));
   populateAllSelects();renderSectorZones();renderSectorConfigTable();renderMapGeneral();resetSectorEditor();
   toast("Sector guardado");
 }
 function renderSectorZones(){
   const layer=qs("sectorZoneLayer");if(!layer)return;
-  const source=sectorsFor(qs("sectorFrente")?.value||"Planta Nueva");
+  const source=userSectors||[];
   layer.innerHTML=source.map(s=>{
     const r=s.rect;const w=r[2]-r[0],h=r[3]-r[1];
     return `<div class="sector-zone" style="left:${r[0]}%;top:${r[1]}%;width:${w}%;height:${h}%" title="${escapeHtml(s.nombre)}" onclick="event.stopPropagation();focusSectorConfig('${String(s.id||"").replaceAll("'","\\'")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')"><span>${escapeHtml(s.nombre)}</span></div>`
@@ -1314,12 +1277,12 @@ function renderSectorZones(){
 }
 function renderSectorConfigTable(){
   const q=(qs("sectorSearch")?.value||"").toLowerCase();
-  const source=sectorsFor(qs("sectorFrente")?.value||"Planta Nueva");
+  const source=userSectors||[];
   const rows=source.filter(s=>!q||s.nombre.toLowerCase().includes(q));
-  qs("tablaSectoresConfig").innerHTML=rows.map(s=>`<tr><td>${escapeHtml(normFrente(s.frente))}</td><td>${escapeHtml(s.nombre)}</td><td>${escapeHtml(s.actualizado||"")}</td>
+  qs("tablaSectoresConfig").innerHTML=rows.map(s=>`<tr><td>${escapeHtml(s.nombre)}</td><td>${escapeHtml(s.actualizado||"")}</td>
   <td><button class="btn mini secondary" onclick="editSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Editar</button>
   <button class="btn mini secondary" onclick="focusSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Ver</button>
-  <button class="btn mini secondary" onclick="deleteSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Eliminar</button></td></tr>`).join("")||'<tr><td colspan="4">Sin sectores configurados.</td></tr>';
+  <button class="btn mini secondary" onclick="deleteSectorConfig('${String(s.id||"")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')">Eliminar</button></td></tr>`).join("")||'<tr><td colspan="3">Sin sectores configurados.</td></tr>';
 }
 window.focusSectorConfig=function(id,nombre){
   const s=(userSectors||[]).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
@@ -1333,7 +1296,7 @@ window.focusSectorConfig=function(id,nombre){
 }
 window.editSectorConfig=function(id,nombre){
   const s=(userSectors||[]).find(x=>(id&&x.id===id)||x.nombre===nombre);if(!s)return;
-  qs("sectorFrente").value=normFrente(s.frente);updateMapForFrente("sectorizacion");qs("sectorEditId").value=s.id||"";qs("sectorTitulo").value=s.nombre;
+  qs("sectorEditId").value=s.id||"";qs("sectorTitulo").value=s.nombre;
   sectorDraftPoints=[[s.rect[0],s.rect[1]],[s.rect[2],s.rect[3]]];normalizeSectorDraft();focusSectorConfig(id,nombre);
   window.scrollTo({top:0,behavior:"smooth"});
 }
@@ -1343,7 +1306,7 @@ window.deleteSectorConfig=async function(id,nombre){
   if(!s)return;
   userSectors=userSectors.filter(x=>x!==s);
   if(CONFIG.apiUrl)await postRemote({action:"deleteSector",password:"2026Unacem",id:s.id,nombre:s.nombre});
-  DATA.lugares=userSectors.map(x=>({nombre:x.nombre,frente:x.frente,x:x.x,y:x.y,rect:x.rect}));
+  DATA.lugares=userSectors.map(x=>({nombre:x.nombre,x:x.x,y:x.y,rect:x.rect}));
   populateAllSelects();renderSectorZones();renderSectorConfigTable();renderMapGeneral();toast("Sector eliminado");
 }
 
