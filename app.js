@@ -141,7 +141,9 @@ let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || s
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
 let charts = {};
 let selectedSector = null;
-let sectorAdminUnlocked = sessionStorage.getItem("tar_sector_admin")==="1";
+// REV.12.1: el acceso a Sectorización vuelve a solicitar clave en cada carga de la app.
+let sectorAdminUnlocked = false;
+sessionStorage.removeItem("tar_sector_admin");
 let sectorMarking = false;
 let sectorDraftPoints = [];
 const FRENTES=["Planta Nueva","Planta Antigua"];
@@ -1149,18 +1151,38 @@ async function loadRemote(){
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
         return local?{...local,...l,rect:local?.rect}:l;
       });
-      userSectors=(res.data.sectores||[]).map(s=>({
+      // REV.12.4: restauración exacta de la sectorización histórica de Planta Nueva.
+      // Los sectores históricos de Planta Nueva conservan SIEMPRE las coordenadas/rectángulos
+      // de la versión V11.1 que funcionaba correctamente. Esto evita que coordenadas desplazadas
+      // guardadas durante las pruebas V12.x vuelvan a mover las zonas.
+      // Planta Antigua continúa usando sus sectores independientes guardados en Google Sheets.
+      const remoteSectors=(res.data.sectores||[]).map(s=>({
         id:s.id||s.ID||"",
         nombre:s.nombre||s.Nombre||s.Sector||"",
-        frente:normFrente(s.frente||s.Frente),
+        frente:normFrente(s.frente||s.Frente||"Planta Nueva"),
         x:Number(s.x||s.X||0),
         y:Number(s.y||s.Y||0),
-        rect:Array.isArray(s.rect)?s.rect:[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
+        rect:Array.isArray(s.rect)?s.rect.map(Number):[Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)],
         actualizado:s.actualizado||s.Actualizado||""
       })).filter(s=>s.nombre && s.rect.every(Number.isFinite));
-      if(userSectors.length){
-        DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
-      }
+
+      const histPN=(DEFAULT_DATA.lugares||[]).map((s,i)=>({
+        id:`LEGACY-PN-${i+1}`,
+        nombre:s.nombre,
+        frente:"Planta Nueva",
+        x:Number(s.x||0),
+        y:Number(s.y||0),
+        rect:Array.isArray(s.rect)?s.rect.map(Number):[0,0,0,0],
+        actualizado:"Sectorización histórica V11.1"
+      }));
+
+      // Mantener también cualquier sector adicional de Planta Nueva que no existía en V11.1,
+      // pero nunca reemplazar las coordenadas históricas de los sectores ya conocidos.
+      const histNames=new Set(histPN.map(s=>String(s.nombre||"").trim().toUpperCase()));
+      const extraPN=remoteSectors.filter(s=>s.frente==="Planta Nueva" && !histNames.has(String(s.nombre||"").trim().toUpperCase()));
+      const antigua=remoteSectors.filter(s=>s.frente==="Planta Antigua");
+      userSectors=[...histPN,...extraPN,...antigua];
+      DATA.lugares=userSectors.map(s=>({nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect}));
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
 
@@ -1213,7 +1235,6 @@ async function sectorLogin(){
   const pwd=qs("sectorPassword").value;
   if(pwd!=="2026Unacem"){toast("Clave incorrecta");return}
   sectorAdminUnlocked=true;
-  sessionStorage.setItem("tar_sector_admin","1");
   qs("sectorPassword").value="";
   renderSectorizacionAccess();
   toast("Acceso a sectorización habilitado");

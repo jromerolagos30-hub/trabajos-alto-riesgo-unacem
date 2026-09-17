@@ -399,3 +399,11 @@ label,.field{display:block;font-size:12px;font-weight:700;color:#3b4650}input,se
 
 /* REV.12 – selección de frente/plano Atocongo */
 .sector-front-select{display:inline-flex;gap:8px;align-items:center;margin-top:8px;font-weight:700}.sector-front-select select{min-width:170px}.map-filters{flex-wrap:wrap}.map-filters label{min-width:135px}@media(max-width:700px){.sector-front-select{display:flex;align-items:flex-start;flex-direction:column}.sector-front-select select{width:100%}.map-filters label{min-width:0;width:100%}}
+
+/* V12.5 - Plano Planta Antigua: renderizado de alta resolución.
+   No modifica coordenadas, sectores ni lógica del mapa. */
+.map-stage img[src*="mapa_planta_antigua"]{
+  image-rendering:auto;
+  -ms-interpolation-mode:bicubic;
+  backface-visibility:hidden;
+}
