@@ -141,7 +141,7 @@ let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || s
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
 let charts = {};
 let selectedSector = null;
-// REV.12.6: Sectorización mantiene ingreso controlado y usa exclusivamente la pestaña Sectores.
+// REV.12.7: carga rápida con snapshot local + bootstrap cacheado. Sectorización sigue usando exclusivamente Sectores.
 let sectorAdminUnlocked = false;
 sessionStorage.removeItem("tar_sector_admin");
 let sectorMarking = false;
@@ -186,7 +186,11 @@ function isActive(r){return (r.EstadoOperativo||"ACTIVO")!=="FINALIZADO"}
 function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
   qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("frente").value="Planta Nueva"; qs("mapFiltroFrente").value="Planta Nueva"; qs("sectorFrente").value="Planta Nueva"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
-  wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion(); renderConfig(); refreshAll(); renderEmergencyControls();
+  wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion();
+  // REV.12.7: mostrar inmediatamente el último estado conocido sin esperar Apps Script.
+  loadCachedRemoteSnapshot();
+  renderConfig(); refreshAll(); renderEmergencyControls();
+  // Sincronización real en segundo plano.
   loadRemote();
 }
 
@@ -1142,10 +1146,9 @@ function jsonp(action,params={}){
 async function postRemote(payload){
   try{await fetch(CONFIG.apiUrl,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});return true}catch(e){toast("Guardado local; no se pudo sincronizar.");return false}
 }
-async function loadRemote(){
-  try{
-    const res=await jsonp("bootstrap");
-    if(res?.ok){
+function applyRemoteData(remoteData, saveSnapshot=true){
+  if(!remoteData) return;
+  const res={data:remoteData};
       DATA=res.data.config||DATA;
       DATA.lugares=(DATA.lugares||[]).map(l=>{
         const local=DEFAULT_DATA.lugares.find(z=>z.nombre===l.nombre);
@@ -1189,7 +1192,33 @@ async function loadRemote(){
       persist();
       updateMapForFrente("registro");updateMapForFrente("mapa");
       refreshAll();
-    }
+      if(saveSnapshot){
+        try{
+          localStorage.setItem("tar_remote_snapshot_v127", JSON.stringify({
+            ts:Date.now(),
+            data:remoteData
+          }));
+        }catch(e){}
+      }
+}
+
+function loadCachedRemoteSnapshot(){
+  try{
+    const raw=localStorage.getItem("tar_remote_snapshot_v127");
+    if(!raw) return false;
+    const snap=JSON.parse(raw);
+    if(!snap?.data) return false;
+    applyRemoteData(snap.data,false);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function loadRemote(){
+  try{
+    const res=await jsonp("bootstrap");
+    if(res?.ok) applyRemoteData(res.data,true);
   }catch(e){
     console.warn("Sincronización automática no disponible temporalmente",e);
   }
