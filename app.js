@@ -141,7 +141,7 @@ let registros = JSON.parse(localStorage.getItem("tar_registros") || "null") || s
 let conexas = JSON.parse(localStorage.getItem("tar_conexas") || "null") || structuredClone(DEMO_CONEXAS);
 let charts = {};
 let selectedSector = null;
-// REV.12.7: carga rápida con snapshot local + bootstrap cacheado. Sectorización sigue usando exclusivamente Sectores.
+// REV.12.8: carga inicial liviana + sincronización completa diferida. Sectorización usa exclusivamente Sectores.
 let sectorAdminUnlocked = false;
 sessionStorage.removeItem("tar_sector_admin");
 let sectorMarking = false;
@@ -187,11 +187,12 @@ function init(){
   ["fechaResumen","fecha","filtroMisFecha","conFecha","filtroConFecha","mapFiltroFecha","listaFecha"].forEach(id=>qs(id).value=today());
   qs("horaInicio").value=nowTime(); qs("horaTermino").value="17:00"; qs("frente").value="Planta Nueva"; qs("mapFiltroFrente").value="Planta Nueva"; qs("sectorFrente").value="Planta Nueva"; qs("conHora").value=nowTime(); qs("contFecha").value=yesterday();
   wireNavigation(); setupZoomableMaps(); wireEvents(); setupSectorizacion();
-  // REV.12.7: mostrar inmediatamente el último estado conocido sin esperar Apps Script.
-  loadCachedRemoteSnapshot();
+  // REV.12.8: mostrar snapshot inmediatamente; pedir solo catálogos/sectores primero.
+  const hadSnapshot=loadCachedRemoteSnapshot();
   renderConfig(); refreshAll(); renderEmergencyControls();
-  // Sincronización real en segundo plano.
-  loadRemote();
+  loadFastBootstrap();
+  // Registros, conexas y dashboards se sincronizan después, sin bloquear los desplegables.
+  setTimeout(()=>loadRemote(), hadSnapshot?1200:1800);
 }
 
 function wireNavigation(){
@@ -1184,14 +1185,10 @@ function applyRemoteData(remoteData, saveSnapshot=true){
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
 
-      // REV.10: Google Sheets es la fuente de verdad de catálogos.
-      // Repoblar Empresa, Área Usuaria, Trabajos y Riesgos después del bootstrap.
-      populateAllSelects();
-      renderEmergencyControls();
-
+      // REV.12.8: una sola pasada de renderizado después de la sincronización completa.
       persist();
-      updateMapForFrente("registro");updateMapForFrente("mapa");
       refreshAll();
+      renderEmergencyControls();
       if(saveSnapshot){
         try{
           localStorage.setItem("tar_remote_snapshot_v127", JSON.stringify({
@@ -1212,6 +1209,49 @@ function loadCachedRemoteSnapshot(){
     return true;
   }catch(e){
     return false;
+  }
+}
+
+
+function applyFastBootstrap(remoteData){
+  if(!remoteData) return;
+  if(remoteData.config){
+    DATA={...DATA,...remoteData.config};
+  }
+  const remoteSectors=(remoteData.sectores||[]).map(s=>({
+    id:s.id||s.ID||"",
+    nombre:String(s.nombre||s.Nombre||s.Sector||"").trim(),
+    frente:normFrente(s.frente||s.Frente||"Planta Nueva"),
+    x:Number(s.x ?? s.X ?? 0),
+    y:Number(s.y ?? s.Y ?? 0),
+    rect:Array.isArray(s.rect)
+      ? s.rect.map(Number)
+      : [Number(s.X1),Number(s.Y1),Number(s.X2),Number(s.Y2)]
+  })).filter(s=>s.nombre && s.rect.length===4 && s.rect.every(Number.isFinite));
+
+  const seen=new Set();
+  userSectors=remoteSectors.filter(s=>{
+    const key=s.id ? `ID:${s.id}` : `FN:${s.frente}|${s.nombre.toUpperCase()}`;
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  DATA.lugares=userSectors.map(s=>({
+    nombre:s.nombre,frente:s.frente,x:s.x,y:s.y,rect:s.rect
+  }));
+
+  // Solo actualizar controles del formulario: no gráficos, tablas ni mapas pesados.
+  populateAllSelects();
+  renderEmergencyControls();
+  updateMapForFrente("registro");
+}
+
+async function loadFastBootstrap(){
+  try{
+    const res=await jsonp("fastBootstrap");
+    if(res?.ok) applyFastBootstrap(res.data);
+  }catch(e){
+    console.warn("Carga rápida no disponible temporalmente",e);
   }
 }
 
