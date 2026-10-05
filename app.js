@@ -154,12 +154,15 @@ function updateMapForFrente(context){
   const f=context==="registro"?normFrente(qs("frente")?.value):context==="mapa"?normFrente(qs("mapFiltroFrente")?.value):normFrente(qs("sectorFrente")?.value);
   const img=qs(context==="registro"?"registroMapImg":context==="mapa"?"mapGeneralImg":"sectorMapImg");if(img){img.src=mapAsset(f);img.alt=`Mapa de evacuación ${f}`}
   if(context==="registro"){
+    renderResourceMarkers("registroResourceLayer",f);
     qs("registroMapTitle").textContent=`Plano – ${f}`;const ls=sectorsFor(f);setOptions("lugar",ls.map(x=>x.nombre),"Seleccione");clearMarker();
   }
-  if(context==="mapa"){selectedSector=null;qs("sectorEmpty")?.classList.remove("hidden");qs("sectorDetail")?.classList.add("hidden");renderMapGeneral()}
-  if(context==="sectorizacion"){clearSectorDraft();resetSectorEditor();renderSectorZones();renderSectorConfigTable()}
+  if(context==="mapa"){renderResourceMarkers("mapResourceLayer",f);selectedSector=null;qs("sectorEmpty")?.classList.remove("hidden");qs("sectorDetail")?.classList.add("hidden");renderMapGeneral()}
+  if(context==="sectorizacion"){renderResourceMarkers("sectorResourceLayer",f);populateResourceSectorOptions();clearSectorDraft();resetSectorEditor();renderSectorZones();renderSectorConfigTable()}
 }
 let userSectors = [];
+let emergencyResources = [];
+let resourceMarking = false;
 let pendingConexaPhoto = "";
 let isSavingRegistro = false;
 let isSavingConexa = false;
@@ -349,6 +352,8 @@ function renderResumen(){
   qs("kpiRiesgos").textContent=new Set(rs.flatMap(r=>arr(r.RiesgosCriticos))).size;
   drawChart("chartCriticos",countFlat(rs,"TrabajoCritico"),"doughnut");
   drawChart("chartRiesgos",countFlat(rs,"RiesgosCriticos"),"bar");
+  const inicioEmp={};rs.forEach(r=>inicioEmp[r.Empresa]=(inicioEmp[r.Empresa]||0)+Number(r.NTrabajadores||0));
+  drawChart("chartInicioTrabajadoresEmpresa",inicioEmp,"bar");
   const byPlace=countSimple(rs,"Lugar");
   qs("areasMayorActividad").innerHTML=Object.entries(byPlace).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>`<span class="activity-chip ${loadClass(v)}">${escapeHtml(k)} (${v})</span>`).join("")||"<small>Sin registros para la fecha.</small>";
 }
@@ -900,6 +905,31 @@ function normalizeSectorKey(v){
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .trim().replace(/\s+/g," ").toUpperCase();
 }
+
+function resourceTypeMeta(tipo){
+  const t=String(tipo||"").toUpperCase();
+  if(t==="DEA")return {cls:"dea",short:"DEA",name:"DEA / Desfibrilador"};
+  if(t==="ESTACION_SECUNDARIA")return {cls:"station",short:"E",name:"Estación de Emergencia Secundaria"};
+  if(t==="GABINETE")return {cls:"cabinet",short:"G",name:"Gabinete de Emergencia"};
+  return {cls:"other",short:"R",name:"Recurso de emergencia"};
+}
+function renderResourceMarkers(layerId,frente){
+  const layer=qs(layerId);if(!layer)return;
+  const f=normFrente(frente);
+  layer.innerHTML=(emergencyResources||[]).filter(r=>normFrente(r.frente||r.Frente)===f && String(r.estado||r.Estado||"ACTIVO").toUpperCase()!=="INACTIVO").map(r=>{
+    const m=resourceTypeMeta(r.tipo||r.Tipo);
+    const title=`${m.name} | ${r.sector||r.Sector||""} | ${r.ubicacion||r.UbicacionEspecifica||""}`;
+    return `<button type="button" class="emergency-resource-marker" style="left:${Number(r.x??r.X)}%;top:${Number(r.y??r.Y)}%" title="${escapeHtml(title)}">
+      <span class="resource-pin ${m.cls}">${m.short}</span>
+      <span class="resource-label">${escapeHtml(m.name)} · ${escapeHtml(r.ubicacion||r.UbicacionEspecifica||"")}</span>
+    </button>`;
+  }).join("");
+}
+function renderPermanentResources(){
+  renderResourceMarkers("registroResourceLayer",qs("frente")?.value||"Planta Nueva");
+  renderResourceMarkers("mapResourceLayer",qs("mapFiltroFrente")?.value||"Planta Nueva");
+  renderResourceMarkers("sectorResourceLayer",qs("sectorFrente")?.value||"Planta Nueva");
+}
 function renderMapGeneral(){
   const complianceFilter=qs("filtroMapaCumplimiento")?.value||"";
   const rs=filteredForMap().filter(r=>recordMatchesCompliance(r,complianceFilter));
@@ -929,6 +959,7 @@ function renderMapGeneral(){
     }).join("");
 
   renderEmergencyDashboardCharts(rs);
+  renderResourceMarkers("mapResourceLayer",qs("mapFiltroFrente")?.value||"Planta Nueva");
   if(selectedSector)selectSector(selectedSector,false);
 }
 window.selectSector=function(nombre,scroll=true){
@@ -954,8 +985,8 @@ function renderListaDashboard(){
   drawChart("chartEmergenciaEmpresaLista",emergenciaEmpresa,"bar",{datasetLabel:"% implementación"});
   drawChart("chartEmergenciaAreaLista",emergenciaArea,"bar",{datasetLabel:"% implementación"});
   const missing=countMissingEmergencyControls(rs);drawChart("chartControlesFaltantes",missing,"bar",{datasetLabel:"Registros con brecha"});
-  const rows=[];rs.forEach(r=>{const m=missingEmergencyControlsFromRecord(r);if(m.length){const by={};m.forEach(x=>(by[x.work]||(by[x.work]=[])).push(x.control));Object.entries(by).forEach(([work,controls])=>rows.push(`<tr><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(work)}</td><td>${escapeHtml([...new Set(controls)].join(", "))}</td></tr>`))}});
-  qs("tablaBrechasEmergencia").innerHTML=rows.join("")||`<tr><td colspan="3">Sin brechas para los filtros seleccionados.</td></tr>`;
+  const rows=[];rs.forEach(r=>{const m=missingEmergencyControlsFromRecord(r);if(m.length){const by={};m.forEach(x=>(by[x.work]||(by[x.work]=[])).push(x.control));Object.entries(by).forEach(([work,controls])=>rows.push(`<tr><td>${escapeHtml(r.Empresa)}</td><td>${escapeHtml(r.AreaUsuaria||"—")}</td><td>${escapeHtml(r.Lugar||"—")}</td><td>${escapeHtml(r.Descripcion||"—")}</td><td>${escapeHtml(work)}</td><td>${escapeHtml([...new Set(controls)].join(", "))}</td></tr>`))}});
+  qs("tablaBrechasEmergencia").innerHTML=rows.join("")||`<tr><td colspan="6">Sin brechas para los filtros seleccionados.</td></tr>`;
 }
 
 function aggregateEmergencyCompliance(rs,field){
@@ -1027,65 +1058,73 @@ async function descargarInformeDashboard(){
   if(!rs.length)return toast("No hay actividades para generar el informe con los filtros seleccionados");
   const btn=qs("btnDescargarInforme"),prev=btn.textContent;btn.disabled=true;btn.textContent="Generando informe...";
   try{
-    const {jsPDF}=window.jspdf;const pdf=new jsPDF("l","mm","a4");
-    const f=listFilters(),fecha=f.d||"Periodo filtrado";
-    const empresas=new Set(rs.map(r=>r.Empresa)).size,areas=new Set(rs.map(r=>r.AreaUsuaria).filter(Boolean)).size;
-    const trabajadores=rs.reduce((s,r)=>s+Number(r.NTrabajadores||0),0),global=globalEmergencyCompliance(rs);
-    addReportHeader(pdf,"INFORME DIARIO - TRABAJOS DE ALTO RIESGO",`Fecha: ${fecha} | Generado: ${new Date().toLocaleString()}`);
-    pdf.setFont("helvetica","bold");pdf.setFontSize(11);pdf.text("Resumen ejecutivo",12,28);
-    const cards=[["Actividades",rs.length],["Trabajadores",trabajadores],["Empresas",empresas],["Areas usuarias",areas],["Controles emergencia",global.pct+"%"]];
-    cards.forEach((c,i)=>{const x=12+i*55;pdf.setDrawColor(220);pdf.roundedRect(x,34,50,20,2,2);pdf.setFontSize(7);pdf.setFont("helvetica","normal");pdf.text(c[0],x+4,41);pdf.setFontSize(14);pdf.setFont("helvetica","bold");pdf.text(String(c[1]),x+4,50)});
-    const byArea={};rs.forEach(r=>byArea[r.AreaUsuaria||"Sin area"]=(byArea[r.AreaUsuaria||"Sin area"]||0)+1);
-    pdf.setFontSize(10);pdf.text("Actividades por area usuaria",12,66);
-    let y=73;Object.entries(byArea).sort((a,b)=>b[1]-a[1]).slice(0,18).forEach(([k,v])=>{pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.text(pdfSafe(k),12,y);pdf.text(String(v),75,y);y+=5});
-    pdf.setFont("helvetica","bold");pdf.text("Principales trabajos criticos",100,66);
-    y=73;Object.entries(countFlat(rs,"TrabajoCritico")).sort((a,b)=>b[1]-a[1]).slice(0,18).forEach(([k,v])=>{pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.text(pdfSafe(k).slice(0,48),100,y);pdf.text(String(v),185,y);y+=5});
+    const {jsPDF}=window.jspdf,pdf=new jsPDF("l","mm","a4");
+    const f=listFilters(),fecha=f.d||"Periodo filtrado",trabajadores=rs.reduce((s,r)=>s+Number(r.NTrabajadores||0),0);
+    const empresas=new Set(rs.map(r=>r.Empresa)).size,areas=new Set(rs.map(r=>r.AreaUsuaria).filter(Boolean)).size,global=globalEmergencyCompliance(rs);
+    addReportHeader(pdf,"INFORME GERENCIAL - TRABAJOS DE ALTO RIESGO",`Fecha: ${fecha} | Actualizado: ${new Date().toLocaleString()}`);
+    const cards=[["Actividades",rs.length],["Trabajadores",trabajadores],["Empresas",empresas],["Areas usuarias",areas],["Emergencia",global.pct+"%"]];
+    cards.forEach((c,i)=>{const x=10+i*57;pdf.setDrawColor(220);pdf.roundedRect(x,23,53,17,2,2);pdf.setFontSize(7);pdf.setFont("helvetica","normal");pdf.text(c[0],x+4,29);pdf.setFontSize(13);pdf.setFont("helvetica","bold");pdf.text(String(c[1]),x+4,37)});
 
-    // Map pages, one for each front present
-    for(const frente of FRENTES.filter(fr=>rs.some(r=>normFrente(r.Frente)===fr))){
-      pdf.addPage();addReportHeader(pdf,"MAPA DE ACTIVIDADES",`${frente} | ${fecha}`);
-      const map=await buildDailyMapImage(rs,frente);
-      pdf.addImage(map,"JPEG",12,25,273,160,undefined,"FAST");
-      pdf.setFontSize(7);pdf.setFont("helvetica","normal");pdf.text("Los puntos rojos representan las ubicaciones registradas de las actividades filtradas.",12,194);
+    // Página 1: planos nítidos + semáforo por cantidad de trabajadores.
+    const fronts=FRENTES.filter(fr=>rs.some(r=>normFrente(r.Frente)===fr));
+    let mapY=48,mapH=118;
+    if(fronts.length===1){
+      const map=await buildManagerialMapImage(rs,fronts[0]);pdf.setFontSize(9);pdf.setFont("helvetica","bold");pdf.text(fronts[0],10,mapY-3);
+      pdf.addImage(map,"PNG",10,mapY,277,mapH,undefined,"FAST");
+    }else{
+      for(let i=0;i<fronts.length;i++){
+        const map=await buildManagerialMapImage(rs,fronts[i]),x=10+i*140;
+        pdf.setFontSize(9);pdf.setFont("helvetica","bold");pdf.text(fronts[i],x,mapY-3);
+        pdf.addImage(map,"PNG",x,mapY,135,mapH,undefined,"FAST");
+      }
     }
+    pdf.setFont("helvetica","normal");pdf.setFontSize(7);
+    pdf.text("Semáforo por trabajadores en el sector:",10,174);
+    [["1-10","#18a558"],["11-20","#f4c430"],["21+","#e3261c"]].forEach((a,i)=>{const x=55+i*34;pdf.setFillColor(...hexToRgb(a[1]));pdf.circle(x,172.2,2.2,"F");pdf.setTextColor(25);pdf.text(a[0],x+4,174)});
+    pdf.text("El número dentro del marcador corresponde al total de trabajadores reportados en ese sector.",160,174);
 
-    // Area breakdown
-    pdf.addPage();addReportHeader(pdf,"ACTIVIDADES POR AREA USUARIA",fecha);
-    y=27;
-    Object.entries(byArea).sort((a,b)=>b[1]-a[1]).forEach(([area,cant])=>{
-      const ar=rs.filter(r=>(r.AreaUsuaria||"Sin area")===area);
-      if(y>185){pdf.addPage();addReportHeader(pdf,"ACTIVIDADES POR AREA USUARIA",fecha);y=27}
-      pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text(`${pdfSafe(area)} - ${cant} actividad(es) - ${ar.reduce((s,r)=>s+Number(r.NTrabajadores||0),0)} trabajador(es)`,12,y);y+=5;
-      ar.slice(0,8).forEach(r=>{y=addWrappedText(pdf,`${r.Empresa} | ${r.Lugar} | ${r.ZonaEspecifica||"Zona no indicada"} | ${arr(r.TrabajoCritico).join(", ")}`,16,y,265,3.6,7);y+=1});
-      y+=3;
+    // Página 2: panel gerencial compacto.
+    pdf.addPage();addReportHeader(pdf,"TABLERO GERENCIAL",fecha);
+    const byArea=countSimple(rs,"AreaUsuaria"),byEmpWorkers={};rs.forEach(r=>byEmpWorkers[r.Empresa]=(byEmpWorkers[r.Empresa]||0)+Number(r.NTrabajadores||0));
+    const compArea=aggregateEmergencyCompliance(rs,"AreaUsuaria"),compEmp=aggregateEmergencyCompliance(rs,"Empresa"),missing=countMissingEmergencyControls(rs);
+    addHorizontalBarsPdf(pdf,byArea,10,28,132,64,"Actividades por area usuaria","cantidad");
+    addHorizontalBarsPdf(pdf,byEmpWorkers,153,28,134,64,"Trabajadores por empresa","cantidad");
+    addHorizontalBarsPdf(pdf,compArea,10,104,132,60,"Respuesta a emergencias por area","percent");
+    addHorizontalBarsPdf(pdf,compEmp,153,104,134,60,"Respuesta a emergencias por empresa","percent");
+    pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text("Principales brechas de respuesta a emergencias",10,176);
+    let x=10;Object.entries(missing).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([k,v],i)=>{
+      pdf.setDrawColor(225);pdf.roundedRect(x,180,53,14,2,2);pdf.setFont("helvetica","normal");pdf.setFontSize(6.2);pdf.text(pdf.splitTextToSize(pdfSafe(k),42).slice(0,2),x+3,185);pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.text(String(v),x+44,189);x+=56;
     });
-
-    // Emergency by company
-    const compEmp=aggregateEmergencyCompliance(rs,"Empresa"),missEmp=reportMissingSummary(rs,"Empresa");
-    pdf.addPage();addReportHeader(pdf,"RESPUESTA A EMERGENCIAS POR EMPRESA",fecha);
-    y=addSimpleBars(pdf,compEmp,12,28,130,"% de implementacion por empresa");
-    let y2=28;pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.text("Principales brechas por empresa",155,y2);y2+=7;
-    Object.entries(missEmp).slice(0,14).forEach(([k,v])=>{const top=Object.entries(v.missing).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c} (${n})`).join(", ")||"Sin brechas";y2=addWrappedText(pdf,`${k}: ${top}`,155,y2,130,3.8,7);y2+=2});
-
-    // Emergency by area
-    const compArea=aggregateEmergencyCompliance(rs,"AreaUsuaria"),missArea=reportMissingSummary(rs,"AreaUsuaria");
-    pdf.addPage();addReportHeader(pdf,"RESPUESTA A EMERGENCIAS POR AREA USUARIA",fecha);
-    y=addSimpleBars(pdf,compArea,12,28,130,"% de implementacion por area");
-    y2=28;pdf.setFont("helvetica","bold");pdf.setFontSize(10);pdf.text("Principales brechas por area usuaria",155,y2);y2+=7;
-    Object.entries(missArea).slice(0,14).forEach(([k,v])=>{const top=Object.entries(v.missing).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c} (${n})`).join(", ")||"Sin brechas";y2=addWrappedText(pdf,`${k}: ${top}`,155,y2,130,3.8,7);y2+=2});
-
-    // Detail pages
-    pdf.addPage();addReportHeader(pdf,"DETALLE DE ACTIVIDADES",fecha);y=27;
-    rs.forEach((r,i)=>{
-      const line=`${i+1}. ${r.Empresa} | Area: ${r.AreaUsuaria||"-"} | ${r.Lugar} | Zona: ${r.ZonaEspecifica||"-"} | ${arr(r.TrabajoCritico).join(", ")} | ${r.NTrabajadores} trab. | ${r.HoraInicio}-${r.HoraTermino} | Emergencia: ${emergencyComplianceStatsFromRecord(r).pct}%`;
-      const needed=pdf.splitTextToSize(pdfSafe(line),270).length*4+3;
-      if(y+needed>195){pdf.addPage();addReportHeader(pdf,"DETALLE DE ACTIVIDADES",fecha);y=27}
-      y=addWrappedText(pdf,line,12,y,270,4,7.2);y+=2;
-    });
-    pdf.save(`Informe_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,"_")}.pdf`);
-    toast("Informe PDF generado");
+    pdf.save(`Informe_Gerencial_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,"_")}.pdf`);
+    toast("Informe gerencial PDF generado");
   }catch(e){console.error(e);toast("No se pudo generar el informe PDF")}
   finally{btn.disabled=false;btn.textContent=prev}
+}
+function hexToRgb(h){h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
+function addHorizontalBarsPdf(pdf,data,x,y,w,h,title,mode="cantidad"){
+  pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text(pdfSafe(title),x,y);y+=5;
+  const entries=Object.entries(data).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,9),max=mode==="percent"?100:Math.max(1,...entries.map(x=>Number(x[1])||0));
+  const row=Math.min(6,(h-6)/Math.max(1,entries.length));
+  entries.forEach(([k,v])=>{const val=Number(v)||0;pdf.setFont("helvetica","normal");pdf.setFontSize(6.2);pdf.text(pdf.splitTextToSize(pdfSafe(k),42)[0],x,y+3);
+    pdf.setDrawColor(225);pdf.rect(x+45,y,w-62,3.5);const pct=Math.max(0,Math.min(1,val/max));pdf.setFillColor(225,38,28);pdf.rect(x+45,y,(w-62)*pct,3.5,"F");
+    pdf.setFont("helvetica","bold");pdf.text(mode==="percent"?`${val}%`:String(val),x+w-14,y+3);y+=row;
+  });
+}
+async function buildManagerialMapImage(rs,frente){
+  const img=await loadImage(mapAsset(frente)),maxW=3200,scale=Math.min(1,maxW/img.naturalWidth);
+  const c=document.createElement("canvas");c.width=Math.max(1600,Math.round(img.naturalWidth*scale));c.height=Math.round(c.width*img.naturalHeight/img.naturalWidth);
+  const ctx=c.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,0,0,c.width,c.height);
+  const groups={};rs.filter(r=>normFrente(r.Frente)===normFrente(frente)).forEach(r=>{const k=normalizeSectorKey(r.Lugar);if(!groups[k])groups[k]=[];groups[k].push(r)});
+  sectorsFor(frente).forEach(s=>{const items=groups[normalizeSectorKey(s.nombre)]||[];if(!items.length)return;const workers=items.reduce((a,r)=>a+Number(r.NTrabajadores||0),0);
+    const color=workers>=21?"#e3261c":workers>=11?"#f4c430":"#18a558",x=s.x/100*c.width,y=s.y/100*c.height,rad=Math.max(18,c.width/110);
+    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.lineWidth=Math.max(3,c.width/700);ctx.strokeStyle="#fff";ctx.stroke();
+    ctx.fillStyle="#fff";ctx.font=`800 ${Math.round(rad*1.05)}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(workers),x,y+1);
+  });
+  // Recursos permanentes también aparecen en el informe.
+  (emergencyResources||[]).filter(r=>normFrente(r.frente||r.Frente)===normFrente(frente)).forEach(r=>{const m=resourceTypeMeta(r.tipo||r.Tipo),x=Number(r.x??r.X)/100*c.width,y=Number(r.y??r.Y)/100*c.height;
+    ctx.fillStyle=m.cls==="dea"?"#0b8f4d":m.cls==="station"?"#0068b5":"#e3261c";ctx.fillRect(x-18,y-18,36,36);ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.strokeRect(x-18,y-18,36,36);ctx.fillStyle="#fff";ctx.font="800 15px Arial";ctx.fillText(m.short,x,y+1);
+  });
+  return c.toDataURL("image/png");
 }
 
 function renderEmergencyDashboardCharts(rs){
@@ -1320,11 +1359,14 @@ function applyRemoteData(remoteData, saveSnapshot=true){
       }));
       registros=res.data.registros?.length?res.data.registros:registros;
       conexas=res.data.conexas?.length?res.data.conexas:conexas;
+      emergencyResources=Array.isArray(res.data.recursos)?res.data.recursos:emergencyResources;
 
       // REV.12.8: una sola pasada de renderizado después de la sincronización completa.
       persist();
       refreshAll();
       renderEmergencyControls();
+      renderPermanentResources();
+      renderResourceAdminTable();
       if(saveSnapshot){
         try{
           localStorage.setItem("tar_remote_snapshot_v127", JSON.stringify({
@@ -1354,6 +1396,7 @@ function applyFastBootstrap(remoteData){
   if(remoteData.config){
     DATA={...DATA,...remoteData.config};
   }
+  if(Array.isArray(remoteData.recursos)) emergencyResources=remoteData.recursos;
   const remoteSectors=(remoteData.sectores||[]).map(s=>({
     id:s.id||s.ID||"",
     nombre:String(s.nombre||s.Nombre||s.Sector||"").trim(),
@@ -1380,6 +1423,7 @@ function applyFastBootstrap(remoteData){
   populateAllSelects();
   renderEmergencyControls();
   updateMapForFrente("registro");
+  renderPermanentResources();
 }
 
 async function loadFastBootstrap(){
@@ -1421,6 +1465,11 @@ function setupSectorizacion(){
   qs("btnCancelSectorEdit").onclick=resetSectorEditor;
   qs("btnSaveSector").onclick=saveSectorConfig;
   qs("sectorSearch").oninput=renderSectorConfigTable; qs("sectorFrente").onchange=()=>updateMapForFrente("sectorizacion");
+  qs("btnMarkResource").onclick=()=>{resourceMarking=true;qs("mapSectorizacion").classList.add("resource-marking");toast("Haz clic en el punto exacto del recurso")};
+  qs("btnSaveResource").onclick=saveEmergencyResource;
+  qs("btnCancelResource").onclick=resetResourceEditor;
+  qs("resourceSector").onchange=()=>{};
+
   map.addEventListener("click",sectorMapClick);
 }
 function renderSectorizacionAccess(){
@@ -1440,8 +1489,19 @@ async function sectorLogin(){
   toast("Acceso a sectorización habilitado");
 }
 function sectorMapClick(e){
-  if(!sectorAdminUnlocked || !sectorMarking || e.target.closest(".map-zoom-controls")) return;
+  if(!sectorAdminUnlocked || e.target.closest(".map-zoom-controls")) return;
   const stage=e.currentTarget.querySelector(".map-stage");
+  if(resourceMarking){
+    if(!stage)return;
+    const box=stage.getBoundingClientRect();
+    const x=((e.clientX-box.left)/box.width)*100,y=((e.clientY-box.top)/box.height)*100;
+    if(x<0||x>100||y<0||y>100)return;
+    qs("resourceX").value=x.toFixed(3);qs("resourceY").value=y.toFixed(3);
+    resourceMarking=false;e.currentTarget.classList.remove("resource-marking");
+    qs("resourceSelectionSummary").innerHTML=`<strong>Ubicación:</strong> punto definido en el plano.`;
+    toast("Ubicación del recurso definida");return;
+  }
+  if(!sectorMarking) return;
   if(!stage)return;
   const box=stage.getBoundingClientRect();
   const x=((e.clientX-box.left)/box.width)*100;
@@ -1510,7 +1570,8 @@ function renderSectorZones(){
   layer.innerHTML=source.map(s=>{
     const r=s.rect;const w=r[2]-r[0],h=r[3]-r[1];
     return `<div class="sector-zone" style="left:${r[0]}%;top:${r[1]}%;width:${w}%;height:${h}%" title="${escapeHtml(s.nombre)}" onclick="event.stopPropagation();focusSectorConfig('${String(s.id||"").replaceAll("'","\\'")}','${escapeHtml(s.nombre).replaceAll("'","\\'")}')"><span>${escapeHtml(s.nombre)}</span></div>`
-  }).join("");
+   }).join("");
+  renderResourceAdminTable();
 }
 function renderSectorConfigTable(){
   const q=(qs("sectorSearch")?.value||"").toLowerCase();
@@ -1547,6 +1608,58 @@ window.deleteSectorConfig=async function(id,nombre){
   populateAllSelects();renderSectorZones();renderSectorConfigTable();renderMapGeneral();toast("Sector eliminado");
 }
 
+
+
+function populateResourceSectorOptions(){
+  const el=qs("resourceSector");if(!el)return;
+  const prev=el.value,vals=sectorsFor(qs("sectorFrente")?.value||"Planta Nueva").map(s=>s.nombre);
+  el.innerHTML='<option value="">Seleccione</option>'+vals.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  if(vals.includes(prev))el.value=prev;
+}
+function resetResourceEditor(){
+  resourceMarking=false;qs("mapSectorizacion")?.classList.remove("resource-marking");
+  ["resourceEditId","resourceX","resourceY","resourceUbicacion","resourceDescripcion"].forEach(id=>{if(qs(id))qs(id).value=""});
+  if(qs("resourceTipo"))qs("resourceTipo").value="DEA";
+  if(qs("resourceSector"))qs("resourceSector").value="";
+  if(qs("resourceSelectionSummary"))qs("resourceSelectionSummary").innerHTML="<strong>Ubicación:</strong> aún no definida.";
+}
+function renderResourceAdminTable(){
+  if(!qs("tablaRecursosEmergencia"))return;
+  const f=normFrente(qs("sectorFrente")?.value||"Planta Nueva");
+  const rows=(emergencyResources||[]).filter(r=>normFrente(r.frente||r.Frente)===f);
+  qs("tablaRecursosEmergencia").innerHTML=rows.map(r=>{
+    const m=resourceTypeMeta(r.tipo||r.Tipo),id=String(r.id||r.ID||"");
+    return `<tr><td>${escapeHtml(m.name)}</td><td>${escapeHtml(f)}</td><td>${escapeHtml(r.sector||r.Sector||"")}</td><td>${escapeHtml(r.ubicacion||r.UbicacionEspecifica||"")}</td><td>
+      <button class="btn mini secondary" onclick="editEmergencyResource('${id.replaceAll("'","\\'")}')">Editar</button>
+      <button class="btn mini secondary" onclick="deleteEmergencyResource('${id.replaceAll("'","\\'")}')">Eliminar</button></td></tr>`;
+  }).join("")||'<tr><td colspan="5">Sin recursos registrados para este frente.</td></tr>';
+  populateResourceSectorOptions();renderResourceMarkers("sectorResourceLayer",f);
+}
+async function saveEmergencyResource(){
+  if(!sectorAdminUnlocked)return;
+  const tipo=qs("resourceTipo").value,sector=qs("resourceSector").value,ubicacion=qs("resourceUbicacion").value.trim();
+  const x=Number(qs("resourceX").value),y=Number(qs("resourceY").value);
+  if(!sector||!ubicacion){toast("Complete sector y ubicación específica");return}
+  if(!Number.isFinite(x)||!Number.isFinite(y)){toast("Ubique el recurso haciendo clic en el plano");return}
+  const r={id:qs("resourceEditId").value||uid("RE"),tipo,frente:normFrente(qs("sectorFrente").value),sector,ubicacion,descripcion:qs("resourceDescripcion").value.trim(),x,y,estado:"ACTIVO",actualizado:new Date().toLocaleString()};
+  const i=emergencyResources.findIndex(z=>String(z.id||z.ID)===String(r.id));if(i>=0)emergencyResources[i]=r;else emergencyResources.push(r);
+  if(CONFIG.apiUrl)await postRemote({action:"saveResource",resource:r});
+  renderResourceAdminTable();renderPermanentResources();resetResourceEditor();toast("Recurso de emergencia guardado");
+}
+window.editEmergencyResource=function(id){
+  const r=emergencyResources.find(z=>String(z.id||z.ID)===String(id));if(!r)return;
+  qs("sectorFrente").value=normFrente(r.frente||r.Frente);updateMapForFrente("sectorizacion");
+  qs("resourceEditId").value=r.id||r.ID||"";qs("resourceTipo").value=r.tipo||r.Tipo||"DEA";populateResourceSectorOptions();
+  qs("resourceSector").value=r.sector||r.Sector||"";qs("resourceUbicacion").value=r.ubicacion||r.UbicacionEspecifica||"";
+  qs("resourceDescripcion").value=r.descripcion||r.Descripcion||"";qs("resourceX").value=r.x??r.X;qs("resourceY").value=r.y??r.Y;
+  qs("resourceSelectionSummary").innerHTML="<strong>Ubicación:</strong> recurso cargado para edición.";
+}
+window.deleteEmergencyResource=async function(id){
+  if(!confirm("¿Eliminar este recurso de emergencia?"))return;
+  emergencyResources=emergencyResources.filter(z=>String(z.id||z.ID)!==String(id));
+  if(CONFIG.apiUrl)await postRemote({action:"deleteResource",id});
+  renderResourceAdminTable();renderPermanentResources();toast("Recurso eliminado");
+}
 
 // Sincronización silenciosa: al abrir, al volver a la pestaña y cada 5 minutos.
 document.addEventListener("visibilitychange",()=>{

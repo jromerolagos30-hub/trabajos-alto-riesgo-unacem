@@ -11,6 +11,24 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+
+<style>
+.resource-layer{position:absolute;inset:0;pointer-events:none;z-index:18}
+.emergency-resource-marker{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;border:0;background:transparent;padding:0;cursor:pointer;z-index:19}
+.emergency-resource-marker .resource-pin{display:flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:8px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28);font:800 11px/1 Inter,Arial;color:#fff}
+.emergency-resource-marker .resource-label{display:none;position:absolute;left:50%;top:34px;transform:translateX(-50%);background:#111820;color:#fff;padding:5px 7px;border-radius:6px;white-space:nowrap;font:600 10px Inter,Arial;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.emergency-resource-marker:hover .resource-label{display:block}
+.resource-pin.dea,.resource-symbol.dea{background:#0b8f4d}
+.resource-pin.station,.resource-symbol.station{background:#0068b5}
+.resource-pin.cabinet,.resource-symbol.cabinet{background:#e3261c}
+.resource-pin.other{background:#555}
+.resource-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;align-items:center}
+.resource-symbol{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;border-radius:6px;color:#fff;padding:0 5px;margin-right:4px}
+.resource-admin-card{margin-top:18px}
+.resource-marking{cursor:crosshair!important}
+@media(max-width:700px){.emergency-resource-marker .resource-pin{min-width:24px;height:24px;font-size:9px;border-width:2px}}
+</style>
+
 </head>
 <body>
 <header class="topbar">
@@ -69,6 +87,11 @@
         <div class="chart-scroll inicio-chart"><canvas id="chartRiesgos"></canvas></div>
       </article>
     </div>
+
+    <article class="card">
+      <div class="card-head"><h2>Trabajadores por empresa</h2></div>
+      <div class="chart-scroll inicio-chart"><canvas id="chartInicioTrabajadoresEmpresa"></canvas></div>
+    </article>
 
     <article class="card">
       <div class="card-head">
@@ -179,6 +202,7 @@
         </div>
         <div id="mapRegistro" class="plant-map interactive">
           <img id="registroMapImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
+          <div id="registroResourceLayer" class="resource-layer"></div>
           <div class="map-marker hidden" id="registroMarker"><span></span></div>
         </div>
         <div class="legend">
@@ -351,6 +375,7 @@
         <div id="mapGeneral" class="plant-map interactive overview">
           <img id="mapGeneralImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div id="sectorMarkers"></div>
+          <div id="mapResourceLayer" class="resource-layer"></div>
         </div>
       </article>
 
@@ -454,7 +479,7 @@
       <div class="chart-scroll chart-tall"><canvas id="chartControlesFaltantes"></canvas></div>
       <div class="table-wrap mt-10">
         <table class="compact-table">
-          <thead><tr><th>Empresa</th><th>Trabajo crítico</th><th>Controles faltantes</th></tr></thead>
+          <thead><tr><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Actividad</th><th>Trabajo crítico</th><th>Controles faltantes</th></tr></thead>
           <tbody id="tablaBrechasEmergencia"></tbody>
         </table>
       </div>
@@ -542,12 +567,60 @@
           <div id="mapSectorizacion" class="plant-map interactive sector-config-map">
             <img id="sectorMapImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
             <div id="sectorZoneLayer"></div>
+            <div id="sectorResourceLayer" class="resource-layer"></div>
             <div id="sectorDraftZone" class="sector-draft-zone hidden"></div>
           </div>
           <div class="map-help">Consejo: marque únicamente el área ocupada por la instalación o rótulo. Evite superponer zonas.</div>
         </article>
       </div>
 
+
+      <article class="card resource-admin-card">
+        <div class="card-head">
+          <div>
+            <h2>Recursos de respuesta a emergencias</h2>
+            <small>Ubique recursos permanentes de UNACEM. Se mostrarán a las empresas en los planos de Registro y Mapa Interactivo.</small>
+          </div>
+        </div>
+        <div class="form-grid cols-2">
+          <label>Tipo de recurso*
+            <select id="resourceTipo">
+              <option value="DEA">DEA / Desfibrilador</option>
+              <option value="ESTACION_SECUNDARIA">Estación de Emergencia Secundaria</option>
+              <option value="GABINETE">Gabinete de Emergencia</option>
+              <option value="OTRO">Otro recurso</option>
+            </select>
+          </label>
+          <label>Sector*
+            <select id="resourceSector"></select>
+          </label>
+          <label>Ubicación específica*
+            <input id="resourceUbicacion" placeholder="Ej.: Nivel 0, ingreso norte, junto a sala eléctrica">
+          </label>
+          <label>Descripción / referencia
+            <input id="resourceDescripcion" placeholder="Opcional">
+          </label>
+        </div>
+        <input type="hidden" id="resourceEditId">
+        <input type="hidden" id="resourceX"><input type="hidden" id="resourceY">
+        <div class="actions left">
+          <button type="button" class="btn secondary" id="btnMarkResource">Ubicar recurso en plano</button>
+          <button type="button" class="btn primary" id="btnSaveResource">Guardar recurso</button>
+          <button type="button" class="btn secondary" id="btnCancelResource">Cancelar</button>
+        </div>
+        <div id="resourceSelectionSummary" class="info-box"><strong>Ubicación:</strong> aún no definida.</div>
+        <div class="resource-legend">
+          <span><b class="resource-symbol dea">DEA</b> Desfibrilador</span>
+          <span><b class="resource-symbol station">E</b> Estación secundaria</span>
+          <span><b class="resource-symbol cabinet">G</b> Gabinete</span>
+        </div>
+        <div class="table-wrap mt-10">
+          <table>
+            <thead><tr><th>Tipo</th><th>Frente</th><th>Sector</th><th>Ubicación específica</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaRecursosEmergencia"></tbody>
+          </table>
+        </div>
+      </article>
       <article class="card">
         <div class="card-head">
           <div>
