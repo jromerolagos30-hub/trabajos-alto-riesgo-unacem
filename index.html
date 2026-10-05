@@ -138,6 +138,9 @@
           <label>Lugar / Sector*
             <select id="lugar" required></select>
           </label>
+          <label>Zona específica (Piso, nivel, sector, equipo, etc.)*
+            <input id="zonaEspecifica" required maxlength="180" placeholder="Ej.: Edificio de Molinos – Nivel +18 m – Lado norte">
+          </label>
           <div class="field map-choice">
             <span class="label">Ubicación en plano</span>
             <button type="button" class="btn secondary" id="btnElegirMapa">Seleccionar dando clic al mapa</button>
@@ -390,6 +393,7 @@
         <h1>Lista de trabajos y dashboard por sector</h1>
         <p>Dos tablas independientes: trabajos de alto riesgo y coordinaciones conexas.</p>
       </div>
+      <button class="btn primary" id="btnDescargarInforme">📄 Descargar Informe PDF</button>
     </div>
 
     <div class="filters card">
@@ -405,7 +409,7 @@
       <div class="card-head"><h2>Registros de actividades de alto riesgo</h2></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Fecha</th><th>Frente</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Riesgos críticos</th><th>Trabajadores</th><th>% Cumplimiento emergencia</th><th>Controles de emergencia no implementados</th></tr></thead>
+          <thead><tr><th>ID</th><th>Fecha</th><th>Frente</th><th>Empresa</th><th>Área usuaria</th><th>Lugar</th><th>Zona específica</th><th>Trabajo crítico</th><th>Descripción del trabajo</th><th>Riesgos críticos</th><th>Trabajadores</th><th>% Cumplimiento emergencia</th><th>Controles de emergencia no implementados</th></tr></thead>
           <tbody id="tablaRegistros"></tbody>
         </table>
       </div>
@@ -429,6 +433,17 @@
       <article class="card chart-card">
         <div class="card-head"><h2>Trabajadores por empresa</h2></div>
         <div class="chart-scroll"><canvas id="chartSectorEmpresa"></canvas></div>
+      </article>
+    </div>
+
+    <div class="grid two">
+      <article class="card chart-card">
+        <div class="card-head"><div><h2>Respuesta a emergencias por empresa</h2><small>Implementación de controles según actividades filtradas.</small></div></div>
+        <div class="chart-scroll"><canvas id="chartEmergenciaEmpresaLista"></canvas></div>
+      </article>
+      <article class="card chart-card">
+        <div class="card-head"><div><h2>Respuesta a emergencias por área usuaria</h2><small>Implementación de controles según actividades filtradas.</small></div></div>
+        <div class="chart-scroll"><canvas id="chartEmergenciaAreaLista"></canvas></div>
       </article>
     </div>
 
