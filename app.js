@@ -1100,7 +1100,8 @@ async function descargarInformeDashboard(){
         pdf.text(String(z.empresas),281,y+3.5,{align:"center"});
         pdf.setDrawColor(238);pdf.line(210,y+5,285,y+5);y+=5.5;
       });
-      if(zones.length>maxZones){pdf.setFontSize(6);pdf.text(`+ ${zones.length-maxZones} zonas adicionales`,212,y+3);y+=7;}
+      const pendingZones=zones.slice(maxZones);
+      if(pendingZones.length){pdf.setFontSize(5.8);pdf.text(`Ver detalle completo en hoja de continuidad`,212,y+3);y+=7;}
       const byAreaZone=areaZoneSummary(frs);
       y=Math.max(y+6,118);
       pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("Zonas por area usuaria",210,y);y+=4;
@@ -1114,10 +1115,14 @@ async function descargarInformeDashboard(){
         pdf.text(String(z.personas),280,y+3.4,{align:"center"});
         pdf.setDrawColor(238);pdf.line(210,y+5,285,y+5);y+=5.4;
       });
-      if(byAreaZone.length>visible){pdf.setFontSize(5.8);pdf.text(`+ ${byAreaZone.length-visible} combinaciones adicionales`,212,192);}
+      const pendingAreaZones=byAreaZone.slice(visible);
+      if(pendingAreaZones.length){pdf.setFontSize(5.8);pdf.text(`Ver todas las combinaciones en hoja de continuidad`,212,192);}
       pdf.setFillColor(225,38,28);pdf.circle(14,192,2.3,"F");
       pdf.setFont("helvetica","normal");pdf.setFontSize(7);
       pdf.text("Cantidad de actividades criticas registradas en el sector",20,194);
+      if(pendingZones.length || pendingAreaZones.length){
+        await addPlantContinuationPages(pdf,frente,fecha,frs,zones,byAreaZone,maxZones,visible);
+      }
 
     }
 
@@ -1171,10 +1176,97 @@ async function descargarInformeDashboard(){
     pdf.setFont("helvetica","normal");pdf.setFontSize(5.6);
     pdf.text("Controles segun configuracion vigente del aplicativo. Los opcionales dependen de evaluacion especifica.",12,205);
 
+    // Hoja adicional: distribucion de tipos de trabajos criticos por area usuaria.
+    addCriticalWorksAnalysisPages(pdf,rs,fecha);
     pdf.save(`Informe_Gerencial_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,"_")}.pdf`);
-    toast("Informe gerencial de 3 hojas generado");
+    toast("Informe gerencial ampliado generado");
   }catch(e){console.error(e);toast("No se pudo generar el informe PDF")}
   finally{btn.disabled=false;btn.textContent=prev}
+}
+
+
+// Continuación paginada: se repite el plano y se imprimen TODAS las filas restantes.
+async function addPlantContinuationPages(pdf,frente,fecha,rs,zones,areaZones,shownZones,shownAreas){
+  const remainingZones=zones.slice(shownZones),remainingAreas=areaZones.slice(shownAreas);
+  const map=await buildActivityCountMapImage(rs,frente);
+  let zi=0,ai=0,page=0;
+  while(zi<remainingZones.length || ai<remainingAreas.length){
+    pdf.addPage();page++;
+    addReportHeader(pdf,`${frente.toUpperCase()} - DETALLE POR ZONAS (${page})`,`Fecha: ${fecha} | Continuacion del plano y de las tablas`);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Plano de referencia',12,25);
+    pdf.addImage(map,'PNG',12,29,130,115,undefined,'FAST');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.4);
+    pdf.text('Circulos: numero de actividades criticas por sector.',12,151);
+    let y=27;
+    const zoneCap=Math.min(remainingZones.length-zi,13);
+    if(zoneCap>0){
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Zonas - detalle adicional',150,y);y+=4;
+      pdf.setFillColor(245,246,248);pdf.rect(150,y,135,7,'F');pdf.setFontSize(6);
+      pdf.text('SECTOR',152,y+4.5);pdf.text('ACT.',252,y+4.5);pdf.text('PERS.',267,y+4.5);pdf.text('EMP.',280,y+4.5);y+=8;
+      for(let n=0;n<zoneCap;n++,zi++){
+        const z=remainingZones[zi];pdf.setFont('helvetica','normal');pdf.setFontSize(6);
+        pdf.text(pdf.splitTextToSize(pdfSafe(z.zona),96)[0],152,y+3.5);
+        pdf.text(String(z.actividades),254,y+3.5,{align:'center'});
+        pdf.text(String(z.personas),269,y+3.5,{align:'center'});
+        pdf.text(String(z.empresas),282,y+3.5,{align:'center'});
+        pdf.setDrawColor(236);pdf.line(150,y+5,285,y+5);y+=6;
+      }
+    }
+    y=Math.max(y+8,29);
+    if(ai<remainingAreas.length){
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Combinaciones por area usuaria y sector',150,y);y+=4;
+      pdf.setFillColor(245,246,248);pdf.rect(150,y,135,7,'F');pdf.setFontSize(6);
+      pdf.text('AREA USUARIA / SECTOR',152,y+4.5);pdf.text('ACT.',259,y+4.5);pdf.text('PERS.',277,y+4.5);y+=8;
+      while(ai<remainingAreas.length && y<194){
+        const z=remainingAreas[ai++];pdf.setFont('helvetica','normal');pdf.setFontSize(6);
+        pdf.text(pdf.splitTextToSize(pdfSafe(`${z.area} / ${z.zona}`),99)[0],152,y+3.5);
+        pdf.text(String(z.actividades),262,y+3.5,{align:'center'});
+        pdf.text(String(z.personas),280,y+3.5,{align:'center'});
+        pdf.setDrawColor(236);pdf.line(150,y+5,285,y+5);y+=6;
+      }
+    }
+  }
+}
+function criticalWorkAreaData(rs){
+  const works=[...new Set(rs.flatMap(r=>arr(r.TrabajoCritico).map(x=>String(x).trim()).filter(Boolean)))];
+  const areas=[...new Set(rs.map(r=>String(r.AreaUsuaria||'Sin area').trim()))].sort();
+  const matrix=areas.map(area=>{
+    const records=rs.filter(r=>String(r.AreaUsuaria||'Sin area').trim()===area);
+    const values=works.map(w=>records.reduce((n,r)=>n+arr(r.TrabajoCritico).filter(x=>String(x).trim()===w).length,0));
+    return {area,values,total:values.reduce((a,b)=>a+b,0),workers:records.reduce((a,r)=>a+Number(r.NTrabajadores||0),0)};
+  }).sort((a,b)=>b.total-a.total);
+  return {works,matrix};
+}
+function addCriticalWorksAnalysisPages(pdf,rs,fecha){
+  const {works,matrix}=criticalWorkAreaData(rs);
+  const palette=[[49,158,232],[255,89,123],[255,159,64],[245,195,62],[67,187,183],[147,100,248],[94,128,150],[208,97,173],[90,174,89],[180,124,80]];
+  const pageSize=13;
+  for(let start=0;start<Math.max(1,matrix.length);start+=pageSize){
+    pdf.addPage();addReportHeader(pdf,'ANALISIS DE TRABAJOS CRITICOS POR AREA USUARIA',`Fecha: ${fecha} | Actividades por tipo de trabajo critico`);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);
+    pdf.text('Cada segmento de color representa el numero de trabajos criticos de ese tipo registrados por el area.',12,25);
+    const subset=matrix.slice(start,start+pageSize),max=Math.max(1,...matrix.map(r=>r.total));
+    let y=36;
+    subset.forEach(r=>{
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.text(pdf.splitTextToSize(pdfSafe(r.area),52)[0],12,y+4);
+      let x=72;
+      r.values.forEach((v,i)=>{if(!v)return;const w=170*v/max;pdf.setFillColor(...palette[i%palette.length]);pdf.rect(x,y,w,7,'F');
+        if(w>=7){pdf.setTextColor(255);pdf.setFontSize(6.3);pdf.text(String(v),x+w/2,y+4.8,{align:'center'});pdf.setTextColor(20)}x+=w;
+      });
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.text(String(r.total),250,y+4.5);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.text(`${r.workers} trab.`,264,y+4.5);
+      y+=11;
+    });
+    let lx=12,ly=187;
+    works.forEach((w,i)=>{
+      const label=pdfSafe(w),needed=Math.min(95,10+label.length*1.3);
+      if(lx+needed>283){lx=12;ly+=6;}
+      pdf.setFillColor(...palette[i%palette.length]);pdf.rect(lx,ly-3,4,4,'F');
+      pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.text(label,lx+6,ly);lx+=needed;
+    });
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.3);
+    pdf.text('Nota: una actividad registrada puede incluir varios tipos de trabajo critico; cada tipo se cuenta por separado.',12,177);
+  }
 }
 
 function zoneExecutiveSummary(rs,frente){
