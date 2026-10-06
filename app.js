@@ -1061,69 +1061,11 @@ async function descargarInformeDashboard(){
     const {jsPDF}=window.jspdf,pdf=new jsPDF("l","mm","a4");
     const f=listFilters(),fecha=f.d||"Periodo filtrado";
 
-    // HOJAS 1 y 2: una planta por página, mapa grande y resumen por zona.
-    const fronts=["Planta Nueva","Planta Antigua"];
-    for(let page=0;page<fronts.length;page++){
-      const frente=fronts[page],frs=rs.filter(r=>normFrente(r.Frente)===frente);
-      if(page>0)pdf.addPage();
-      addReportHeader(pdf,`ACTIVIDADES DE ALTO RIESGO - ${frente.toUpperCase()}`,`Fecha: ${fecha}`);
-      const totalTrab=frs.reduce((s,r)=>s+Number(r.NTrabajadores||0),0);
-      const totalEmp=new Set(frs.map(r=>r.Empresa).filter(Boolean)).size;
-      const totalAct=frs.length;
-      const cards=[["Actividades",totalAct],["Trabajadores",totalTrab],["Empresas",totalEmp]];
-      cards.forEach((c,i)=>{const x=12+i*43;pdf.setDrawColor(220);pdf.roundedRect(x,22,39,15,2,2);
-        pdf.setFont("helvetica","normal");pdf.setFontSize(6.5);pdf.text(c[0],x+3,27);
-        pdf.setFont("helvetica","bold");pdf.setFontSize(12);pdf.text(String(c[1]),x+3,34);
-      });
-
-      if(frs.length){
-        const map=await buildActivityCountMapImage(frs,frente);
-        pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text("Plano de actividades críticas",12,44);
-        pdf.addImage(map,"PNG",12,48,190,137,undefined,"FAST");
-      }else{
-        pdf.setDrawColor(220);pdf.rect(12,48,190,137);
-        pdf.setFont("helvetica","normal");pdf.setFontSize(10);pdf.text("Sin actividades registradas para esta planta.",65,115);
-      }
-
-      // Panel derecho: resumen de sectores + distribución por área usuaria.
-      pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text("Resumen por zona",210,24);
-      const zones=zoneExecutiveSummary(frs,frente);
-      let y=29;
-      pdf.setFillColor(245,246,248);pdf.rect(210,y,75,7,"F");
-      pdf.setFontSize(6.2);pdf.text("ZONA / SECTOR",212,y+4.5);pdf.text("ACT.",255,y+4.5);pdf.text("PERS.",266,y+4.5);pdf.text("EMP.",278,y+4.5);y+=8;
-      const maxZones=zones.length>14?13:Math.min(zones.length,16);
-      zones.slice(0,maxZones).forEach(z=>{
-        pdf.setFont("helvetica","normal");pdf.setFontSize(5.8);
-        pdf.text(pdf.splitTextToSize(pdfSafe(z.zona),41)[0],212,y+3.5);
-        pdf.text(String(z.actividades),257,y+3.5,{align:"center"});
-        pdf.text(String(z.personas),269,y+3.5,{align:"center"});
-        pdf.text(String(z.empresas),281,y+3.5,{align:"center"});
-        pdf.setDrawColor(238);pdf.line(210,y+5,285,y+5);y+=5.5;
-      });
-      const pendingZones=zones.slice(maxZones);
-      if(pendingZones.length){pdf.setFontSize(5.8);pdf.text(`Ver detalle completo en hoja de continuidad`,212,y+3);y+=7;}
-      const byAreaZone=areaZoneSummary(frs);
-      y=Math.max(y+6,118);
-      pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("Zonas por area usuaria",210,y);y+=4;
-      pdf.setFillColor(245,246,248);pdf.rect(210,y,75,7,"F");pdf.setFontSize(5.8);
-      pdf.text("AREA / SECTOR",212,y+4.5);pdf.text("ACT.",264,y+4.5);pdf.text("PERS.",278,y+4.5);y+=8;
-      const visible=Math.max(0,Math.floor((185-y)/5.4));
-      byAreaZone.slice(0,visible).forEach(z=>{
-        pdf.setFont("helvetica","normal");pdf.setFontSize(5.7);
-        pdf.text(pdf.splitTextToSize(pdfSafe(`${z.area} / ${z.zona}`),48)[0],212,y+3.4);
-        pdf.text(String(z.actividades),267,y+3.4,{align:"center"});
-        pdf.text(String(z.personas),280,y+3.4,{align:"center"});
-        pdf.setDrawColor(238);pdf.line(210,y+5,285,y+5);y+=5.4;
-      });
-      const pendingAreaZones=byAreaZone.slice(visible);
-      if(pendingAreaZones.length){pdf.setFontSize(5.8);pdf.text(`Ver todas las combinaciones en hoja de continuidad`,212,192);}
-      pdf.setFillColor(225,38,28);pdf.circle(14,192,2.3,"F");
-      pdf.setFont("helvetica","normal");pdf.setFontSize(7);
-      pdf.text("Cantidad de actividades criticas registradas en el sector",20,194);
-      if(pendingZones.length || pendingAreaZones.length){
-        await addPlantContinuationPages(pdf,frente,fecha,frs,zones,byAreaZone,maxZones,visible);
-      }
-
+    // Cada planta conserva siempre el mismo tamaño de plano. Primero se agota
+    // Resumen por zona; después comienza, en hojas separadas, Zona por área.
+    for(const frente of ["Planta Nueva","Planta Antigua"]){
+      const frs=rs.filter(r=>normFrente(r.Frente)===frente);
+      await addPlantOrganizedPages(pdf,frente,fecha,frs);
     }
 
     // HOJA 3: cumplimiento, brechas accionables y matriz de controles.
@@ -1136,8 +1078,8 @@ async function descargarInformeDashboard(){
       pdf.setFont("helvetica","normal");pdf.setFontSize(6.3);pdf.text(c[0],x+3,27);
       pdf.setFont("helvetica","bold");pdf.setFontSize(11);pdf.text(String(c[1]),x+3,34);
     });
-    drawComplianceTablePdf(pdf,byArea,12,44,132,"Implementacion por area usuaria",9);
-    drawComplianceTablePdf(pdf,byEmp,153,44,132,"Implementacion por empresa",9);
+    drawComplianceTablePdf(pdf,byArea.slice(0,9),12,44,132,"Implementacion por area usuaria",9);
+    drawComplianceTablePdf(pdf,byEmp.slice(0,9),153,44,132,"Implementacion por empresa",9);
 
     // Brechas desglosadas para coordinar por área usuaria y empresa ejecutora.
     pdf.setFont("helvetica","bold");pdf.setFontSize(8.5);
@@ -1157,7 +1099,7 @@ async function descargarInformeDashboard(){
       pdf.text(lines,110,gy+3);const rh=Math.max(7,lines.length*3.2+2);
       pdf.setDrawColor(237);pdf.line(12,gy+rh,285,gy+rh);gy+=rh;
     });
-    if(brechas.length>4){pdf.setFontSize(6);pdf.text(`+ ${brechas.length-4} pares area/empresa adicionales`,14,Math.min(gy+3,165));}
+
 
     // Matriz de controles configurados en el aplicativo.
     const my=171;
@@ -1176,6 +1118,9 @@ async function descargarInformeDashboard(){
     pdf.setFont("helvetica","normal");pdf.setFontSize(5.6);
     pdf.text("Controles segun configuracion vigente del aplicativo. Los opcionales dependen de evaluacion especifica.",12,205);
 
+    // Anexos completos: sin filas ocultas ni mensajes de adicionales.
+    addEmergencyDetailPages(pdf,fecha,byArea,byEmp,brechas);
+
     // Hoja adicional: distribucion de tipos de trabajos criticos por area usuaria.
     addCriticalWorksAnalysisPages(pdf,rs,fecha);
     pdf.save(`Informe_Gerencial_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,"_")}.pdf`);
@@ -1185,45 +1130,75 @@ async function descargarInformeDashboard(){
 }
 
 
-// Continuación paginada: se repite el plano y se imprimen TODAS las filas restantes.
-async function addPlantContinuationPages(pdf,frente,fecha,rs,zones,areaZones,shownZones,shownAreas){
-  const remainingZones=zones.slice(shownZones),remainingAreas=areaZones.slice(shownAreas);
-  const map=await buildActivityCountMapImage(rs,frente);
-  let zi=0,ai=0,page=0;
-  while(zi<remainingZones.length || ai<remainingAreas.length){
-    pdf.addPage();page++;
-    addReportHeader(pdf,`${frente.toUpperCase()} - DETALLE POR ZONAS (${page})`,`Fecha: ${fecha} | Continuacion del plano y de las tablas`);
-    pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Plano de referencia',12,25);
-    pdf.addImage(map,'PNG',12,29,130,115,undefined,'FAST');
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.4);
-    pdf.text('Circulos: numero de actividades criticas por sector.',12,151);
-    let y=27;
-    const zoneCap=Math.min(remainingZones.length-zi,13);
-    if(zoneCap>0){
-      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Zonas - detalle adicional',150,y);y+=4;
-      pdf.setFillColor(245,246,248);pdf.rect(150,y,135,7,'F');pdf.setFontSize(6);
-      pdf.text('SECTOR',152,y+4.5);pdf.text('ACT.',252,y+4.5);pdf.text('PERS.',267,y+4.5);pdf.text('EMP.',280,y+4.5);y+=8;
-      for(let n=0;n<zoneCap;n++,zi++){
-        const z=remainingZones[zi];pdf.setFont('helvetica','normal');pdf.setFontSize(6);
-        pdf.text(pdf.splitTextToSize(pdfSafe(z.zona),96)[0],152,y+3.5);
-        pdf.text(String(z.actividades),254,y+3.5,{align:'center'});
-        pdf.text(String(z.personas),269,y+3.5,{align:'center'});
-        pdf.text(String(z.empresas),282,y+3.5,{align:'center'});
-        pdf.setDrawColor(236);pdf.line(150,y+5,285,y+5);y+=6;
-      }
-    }
-    y=Math.max(y+8,29);
-    if(ai<remainingAreas.length){
-      pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Combinaciones por area usuaria y sector',150,y);y+=4;
-      pdf.setFillColor(245,246,248);pdf.rect(150,y,135,7,'F');pdf.setFontSize(6);
-      pdf.text('AREA USUARIA / SECTOR',152,y+4.5);pdf.text('ACT.',259,y+4.5);pdf.text('PERS.',277,y+4.5);y+=8;
-      while(ai<remainingAreas.length && y<194){
-        const z=remainingAreas[ai++];pdf.setFont('helvetica','normal');pdf.setFontSize(6);
-        pdf.text(pdf.splitTextToSize(pdfSafe(`${z.area} / ${z.zona}`),99)[0],152,y+3.5);
-        pdf.text(String(z.actividades),262,y+3.5,{align:'center'});
-        pdf.text(String(z.personas),280,y+3.5,{align:'center'});
-        pdf.setDrawColor(236);pdf.line(150,y+5,285,y+5);y+=6;
-      }
+// Misma escala y tamaño de plano en TODAS las páginas de una misma planta.
+async function addPlantOrganizedPages(pdf,frente,fecha,frs){
+  const zones=zoneExecutiveSummary(frs,frente),areas=areaZoneSummary(frs);
+  const map=frs.length?await buildActivityCountMapImage(frs,frente):null;
+  const totalTrab=frs.reduce((v,r)=>v+Number(r.NTrabajadores||0),0);
+  const empresas=new Set(frs.map(r=>r.Empresa).filter(Boolean)).size;
+  let first=addPlantOrganizedPages._first!==false;
+  addPlantOrganizedPages._first=false;
+  const renderPage=(title,rows,kind,offset)=>{
+    if(!first)pdf.addPage();first=false;
+    addReportHeader(pdf,title,`Fecha: ${fecha}`);
+    if(map){pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Plano de actividades criticas',12,44);
+      pdf.addImage(map,'PNG',12,48,190,137,undefined,'FAST');}
+    else {pdf.setFontSize(9);pdf.text('Sin actividades registradas en esta planta.',20,90);}
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.6);
+    pdf.setFillColor(225,38,28);pdf.circle(14,192,2.2,'F');
+    pdf.text('Cantidad de actividades criticas registradas en el sector.',20,194);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+    pdf.text(kind==='zones'?'Resumen por zona':'Zonas por area usuaria',210,25);
+    let y=30;pdf.setFillColor(245,246,248);pdf.rect(210,y,75,8,'F');pdf.setFontSize(5.9);
+    pdf.text(kind==='zones'?'ZONA / SECTOR':'AREA / SECTOR',212,y+5);
+    pdf.text('ACT.',257,y+5,{align:'center'});pdf.text('PERS.',269,y+5,{align:'center'});
+    if(kind==='zones')pdf.text('EMP.',281,y+5,{align:'center'});y+=9;
+    rows.forEach(z=>{pdf.setFont('helvetica','normal');pdf.setFontSize(5.7);
+      const label=kind==='zones'?z.zona:`${z.area} / ${z.zona}`;
+      pdf.text(pdf.splitTextToSize(pdfSafe(label),41)[0],212,y+3.5);
+      pdf.text(String(z.actividades),257,y+3.5,{align:'center'});
+      pdf.text(String(z.personas),269,y+3.5,{align:'center'});
+      if(kind==='zones')pdf.text(String(z.empresas),281,y+3.5,{align:'center'});
+      pdf.setDrawColor(238);pdf.line(210,y+5,285,y+5);y+=5.7;
+    });
+  };
+  // 27 filas por hoja: no mezclar resumen con área usuaria.
+  const cap=27;
+  for(let i=0;i<Math.max(1,zones.length);i+=cap){
+    renderPage(i===0?`ACTIVIDADES DE ALTO RIESGO - ${frente.toUpperCase()}`:`${frente.toUpperCase()} - RESUMEN POR ZONA (${Math.floor(i/cap)+1})`,zones.slice(i,i+cap),'zones',i);
+    if(i===0){pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
+      [['Actividades',frs.length],['Trabajadores',totalTrab],['Empresas',empresas]].forEach(([label,n],j)=>{
+        const x=12+j*43;pdf.setDrawColor(220);pdf.roundedRect(x,22,39,15,2,2);pdf.setFontSize(6);pdf.text(label,x+3,27);
+        pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text(String(n),x+3,34);
+      });}
+  }
+  for(let i=0;i<areas.length;i+=cap){
+    renderPage(`${frente.toUpperCase()} - ZONAS POR AREA USUARIA (${Math.floor(i/cap)+1})`,areas.slice(i,i+cap),'areas',i);
+  }
+}
+function addEmergencyDetailPages(pdf,fecha,byArea,byEmp,brechas){
+  // Las 9 primeras filas ya aparecen en la hoja ejecutiva. El resto va íntegro en anexos.
+  const pendingA=byArea.slice(9),pendingE=byEmp.slice(9);
+  if(pendingA.length||pendingE.length){
+    pdf.addPage();addReportHeader(pdf,'EMERGENCIAS - CUMPLIMIENTO COMPLETO',`Fecha: ${fecha}`);
+    drawComplianceTablePdf(pdf,pendingA,12,30,132,'Areas usuarias - continuacion',pendingA.length);
+    drawComplianceTablePdf(pdf,pendingE,153,30,132,'Empresas - continuacion',pendingE.length);
+  }
+  // Cada par area/empresa aparece con sus controles completos, sin cortar textos.
+  let i=4;
+  while(i<brechas.length){
+    pdf.addPage();addReportHeader(pdf,'EMERGENCIAS - BRECHAS POR AREA Y EMPRESA',`Fecha: ${fecha}`);
+    let y=29;pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+    pdf.text('AREA USUARIA',14,y);pdf.text('EMPRESA',54,y);pdf.text('CONTROLES NO IMPLEMENTADOS',110,y);y+=7;
+    while(i<brechas.length && y<188){
+      const g=brechas[i],line=g.controls.map(([c,n])=>`${c} (${n})`).join('; ');
+      const lines=pdf.splitTextToSize(pdfSafe(line),170);
+      const h=Math.max(8,lines.length*3.4+3);
+      if(y+h>193)break;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(6.3);
+      pdf.text(pdf.splitTextToSize(pdfSafe(g.area),36)[0],14,y+3);
+      pdf.text(pdf.splitTextToSize(pdfSafe(g.empresa),51)[0],54,y+3);
+      pdf.text(lines,110,y+3);pdf.setDrawColor(235);pdf.line(12,y+h,285,y+h);y+=h;i++;
     }
   }
 }
@@ -1360,7 +1335,7 @@ function drawComplianceTablePdf(pdf,rows,x,y,w,title,maxRows=10){
     pdf.setTextColor(20);pdf.setFont("helvetica","bold");pdf.text(`${r.pct}%`,x+w-3,y+3.5,{align:"right"});
     pdf.setDrawColor(235);pdf.line(x,y+5,x+w,y+5);y+=6;
   });
-  if(rows.length>maxRows){pdf.setFont("helvetica","normal");pdf.setFontSize(5.5);pdf.text(`+ ${rows.length-maxRows} adicionales`,x+2,y+3);}
+
 }
 
 function hexToRgb(h){h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
