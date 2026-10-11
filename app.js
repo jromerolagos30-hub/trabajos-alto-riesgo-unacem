@@ -624,12 +624,13 @@ function recordMatchesCompliance(r,range){
   return complianceRange(emergencyComplianceStatsFromRecord(r).pct)===range;
 }
 function globalEmergencyCompliance(rs){
-  let required=0,implemented=0;
+  let required=0,implemented=0,pctSum=0,pctN=0;
   rs.forEach(r=>{
-    const s=emergencyComplianceStatsFromRecord(r);
-    required+=s.required;implemented+=s.implemented;
+    const req=Number(r.NControlesEmergenciaRequeridos||0),imp=Number(r.NControlesEmergenciaImplementados||0);
+    if(req>0){required+=req;implemented+=Math.min(req,imp)}
+    pctSum+=recordEmergencyPct(r);pctN++;
   });
-  return {required,implemented,pct:required?Math.round((implemented/required)*100):0};
+  return {required,implemented,pct:required?Math.round((implemented/required)*100):(pctN?Math.round(pctSum/pctN):0)};
 }
 
 function normalizeText(v){return String(v||"").trim().toLowerCase().replace(/\s+/g," ")}
@@ -989,15 +990,22 @@ function renderListaDashboard(){
   qs("tablaBrechasEmergencia").innerHTML=rows.join("")||`<tr><td colspan="6">Sin brechas para los filtros seleccionados.</td></tr>`;
 }
 
+function recordEmergencyPct(r){
+  const saved=Number(r.PorcentajeCumplimientoEmergencia);
+  if(Number.isFinite(saved) && (saved>0 || Number(r.NControlesEmergenciaRequeridos)>0)) return Math.max(0,Math.min(100,saved));
+  const req=Number(r.NControlesEmergenciaRequeridos||0),imp=Number(r.NControlesEmergenciaImplementados||0);
+  if(req>0)return Math.round(Math.max(0,Math.min(1,imp/req))*100);
+  const st=emergencyComplianceStatsFromRecord(r);
+  return st.pct;
+}
 function aggregateEmergencyCompliance(rs,field){
   const out={};
   rs.forEach(r=>{
     const key=String(r[field]||"Sin dato").trim()||"Sin dato";
-    const st=emergencyComplianceStatsFromRecord(r);
-    if(!out[key])out[key]={req:0,imp:0};
-    out[key].req+=st.required;out[key].imp+=st.implemented;
+    if(!out[key])out[key]={sum:0,n:0};
+    out[key].sum+=recordEmergencyPct(r);out[key].n++;
   });
-  return Object.fromEntries(Object.entries(out).map(([k,v])=>[k,v.req?Math.round(v.imp/v.req*100):0]));
+  return Object.fromEntries(Object.entries(out).map(([k,v])=>[k,v.n?Math.round(v.sum/v.n):0]));
 }
 
 function reportFilteredRecords(){
@@ -1053,314 +1061,142 @@ async function buildDailyMapImage(rs,frente){
   });
   return c.toDataURL("image/jpeg",.9);
 }
+// V12.17 — Informe visual ejecutivo, dos plantas, una hoja por planta.
+function reportConexasForFront(frs, frente, fecha){
+  const ids=new Set(frs.map(r=>String(r.ID||'')));
+  const places=new Set(frs.map(r=>normalizeSectorKey(r.Lugar)));
+  return conexas.filter(c=>{
+    if(fecha && c.Fecha!==fecha)return false;
+    if(c.Frente && normFrente(c.Frente)!==frente)return false;
+    if(c.RegistroID && ids.has(String(c.RegistroID)))return true;
+    // Los registros antiguos pueden no tener Frente/RegistroID: cruzar por sector y fecha.
+    return places.has(normalizeSectorKey(c.Lugar));
+  });
+}
+function reportCard(pdf,x,y,w,label,value,accent){
+  pdf.setFillColor(248,249,251);pdf.setDrawColor(227,230,234);pdf.roundedRect(x,y,w,21,2.5,2.5,'FD');
+  pdf.setFillColor(...accent);pdf.roundedRect(x,y,2.4,21,1,1,'F');
+  pdf.setTextColor(77,87,98);pdf.setFont('helvetica','normal');pdf.setFontSize(7.1);pdf.text(pdfSafe(label),x+6,y+7.5);
+  pdf.setTextColor(27,38,52);pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text(String(value),x+6,y+16.7);
+}
+function reportFitLine(pdf,text,maxWidth,fontSize=7){
+  pdf.setFontSize(fontSize);let s=pdfSafe(text||'—');
+  while(s.length>4 && pdf.getTextWidth(s)>maxWidth)s=s.slice(0,-2);
+  return s===pdfSafe(text||'—')?s:s.trimEnd()+'…';
+}
+async function reportPhoto(pdf,src,x,y,w,h){
+  try{const im=await loadImage(src);const cv=document.createElement('canvas');cv.width=1100;cv.height=Math.round(cv.width*h/w);const ctx=cv.getContext('2d');
+    const iw=im.naturalWidth,ih=im.naturalHeight,ratio=Math.max(cv.width/iw,cv.height/ih),sw=cv.width/ratio,sh=cv.height/ratio;
+    ctx.drawImage(im,(iw-sw)/2,(ih-sh)/2,sw,sh,0,0,cv.width,cv.height);
+    pdf.addImage(cv.toDataURL('image/jpeg',.87),'JPEG',x,y,w,h,undefined,'FAST');return true;
+  }catch(e){console.warn('Fotografía del informe no disponible',src,e);return false}
+}
 async function descargarInformeDashboard(){
   const rs=reportFilteredRecords();
-  if(!rs.length)return toast("No hay actividades para generar el informe con los filtros seleccionados");
-  const btn=qs("btnDescargarInforme"),prev=btn.textContent;btn.disabled=true;btn.textContent="Generando informe...";
+  if(!rs.length)return toast('No hay actividades para generar el informe con los filtros seleccionados');
+  const btn=qs('btnDescargarInforme'),prev=btn.textContent;btn.disabled=true;btn.textContent='Generando informe visual...';
   try{
-    const {jsPDF}=window.jspdf,pdf=new jsPDF("l","mm","a4");
-    const f=listFilters(),fecha=f.d||"Periodo filtrado";
-
-    // Cada planta conserva siempre el mismo tamaño de plano. Primero se agota
-    // Resumen por zona; después comienza, en hojas separadas, Zona por área.
-    for(const frente of ["Planta Nueva","Planta Antigua"]){
-      const frs=rs.filter(r=>normFrente(r.Frente)===frente);
-      await addPlantOrganizedPages(pdf,frente,fecha,frs);
+    const {jsPDF}=window.jspdf,pdf=new jsPDF('l','mm','a4'),f=listFilters(),fecha=f.d||'Periodo filtrado';
+    const fronts=['Planta Nueva','Planta Antigua'];
+    for(let p=0;p<fronts.length;p++){
+      if(p)pdf.addPage();const frente=fronts[p],frs=rs.filter(r=>normFrente(r.Frente)===frente);
+      const workers=frs.reduce((s,r)=>s+Number(r.NTrabajadores||0),0),companies=new Set(frs.map(r=>r.Empresa).filter(Boolean)).size;
+      const cx=reportConexasForFront(frs,frente,f.d||'');
+      const cxCount=cx.reduce((sum,c)=>sum+Math.max(1,(c.EmpresasConexas||[]).length),0);
+      const pct=frs.length?globalEmergencyCompliance(frs).pct:null;
+      // Cabecera fotográfica corporativa; imágenes independientes por planta.
+      pdf.setFillColor(224,35,28);pdf.rect(0,0,297,36,'F');
+      const photo=frente==='Planta Nueva'?'foto_informe_planta_nueva.jpg':'foto_informe_planta_antigua.jpg';
+      await reportPhoto(pdf,photo,204,0,93,36);
+      pdf.setFillColor(190,22,19);pdf.triangle(196,0,214,0,196,36,'F');
+      pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(15.2);pdf.text('ACTIVIDADES DE ALTO RIESGO',10,13);
+      pdf.setFontSize(13.2);pdf.text(frente.toUpperCase(),10,23);
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8.2);pdf.text(`REPORTE PREVENTIVO  |  ${pdfSafe(fecha)}`,10,30);
+      reportCard(pdf,9,41,52,'Actividades',frs.length,[225,38,28]);
+      reportCard(pdf,66,41,52,'Trabajadores',workers,[30,84,157]);
+      reportCard(pdf,123,41,52,'Empresas',companies,[21,133,84]);
+      reportCard(pdf,180,41,52,'Coord. conexas',cxCount,[112,65,160]);
+      reportCard(pdf,237,41,51,'Controles emergencia',pct===null?'Sin datos':pct+'%',[220,138,25]);
+      // Mapa y concentraciones: posiciones de sectorización sin alterar.
+      pdf.setTextColor(28,43,62);pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.text('¿DÓNDE SE CONCENTRAN LOS TRABAJOS?',10,72);
+      pdf.setDrawColor(229,233,237);pdf.roundedRect(9,76,191,104,2,2,'S');
+      const map=await buildActivitiesMapImage(frs,frente);
+      const im=await loadImage(map),ratio=im.naturalWidth/im.naturalHeight;
+      let mw=187,mh=mw/ratio;if(mh>100){mh=100;mw=mh*ratio}
+      pdf.addImage(map,'PNG',11+(187-mw)/2,78+(100-mh)/2,mw,mh,undefined,'NONE');
+      pdf.setFontSize(7);pdf.setTextColor(91,101,112);pdf.setFont('helvetica','normal');
+      pdf.text('Los círculos indican actividades por sector; los recursos de emergencia son referenciales.',10,184);
+      const zones=zoneSummary(frs);const px=205;
+      pdf.setFillColor(244,246,249);pdf.roundedRect(px,69,83,116,2.5,2.5,'F');
+      pdf.setTextColor(28,43,62);pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.text('ZONAS DE MAYOR ACTIVIDAD',px+4,78);
+      pdf.setFontSize(6.6);pdf.setTextColor(106,115,126);pdf.text('SECTOR',px+4,86);pdf.text('ACT.',px+58,86);pdf.text('PERS.',px+69,86);
+      let y=92;
+      zones.slice(0,9).forEach((z,i)=>{
+        if(i%2===0){pdf.setFillColor(255);pdf.rect(px+3,y-5,77,9,'F')}
+        pdf.setTextColor(30,44,59);pdf.setFont('helvetica',i<3?'bold':'normal');
+        pdf.text(reportFitLine(pdf,z.zone,51,6.4),px+4,y);
+        pdf.text(String(z.activities),px+60,y,{align:'center'});pdf.text(String(z.workers),px+73,y,{align:'center'});y+=9.6;
+      });
+      if(zones.length>9){pdf.setFont('helvetica','italic');pdf.setFontSize(6.4);pdf.setTextColor(100);pdf.text(`+ ${zones.length-9} sectores adicionales`,px+4,181)}
+      // Pie con tipo de trabajos y proceso, sin inventar accidentes.
+      pdf.setFillColor(245,247,250);pdf.roundedRect(9,190,279,12,2,2,'F');
+      const typeCounts={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>typeCounts[t]=(typeCounts[t]||0)+1));
+      const types=Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      pdf.setFont('helvetica','bold');pdf.setTextColor(38,54,72);pdf.setFontSize(7.3);pdf.text('TIPOS DE TRABAJO:',13,197.5);
+      let tx=51;types.forEach(([t,n])=>{const label=reportFitLine(pdf,`${t}: ${n}`,45,6.8);pdf.setFont('helvetica','normal');pdf.text(label,tx,197.5);tx+=Math.min(49,pdf.getTextWidth(label)+9)});
+      pdf.setFillColor(31,43,58);pdf.rect(0,205,297,5,'F');
+      pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(7.4);
+      pdf.text('PROGRAMA   >   IMPLEMENTA   >   COORDINA   >   REPORTA',10,208.5);
+      pdf.setFont('helvetica','italic');pdf.setFontSize(7.1);
+      pdf.text('Unidos crecemos para construir un mundo sostenible',287,208.5,{align:'right'});
     }
-
-    // HOJA 3: cumplimiento, brechas accionables y matriz de controles.
-    pdf.addPage();addReportHeader(pdf,"RECURSOS Y CONTROLES DE RESPUESTA A EMERGENCIAS",`Fecha: ${fecha}`);
-    const overall=emergencyComplianceByRequirement(rs);
-    const byArea=emergencyComplianceGroups(rs,"AreaUsuaria");
-    const byEmp=emergencyComplianceGroups(rs,"Empresa");
-    const kpis=[["Actividades",rs.length],["Controles aplicables",overall.required],["Implementados",overall.implemented],["Implementacion",overall.pct+"%"]];
-    kpis.forEach((c,i)=>{const x=12+i*52;pdf.setDrawColor(220);pdf.roundedRect(x,22,48,15,2,2);
-      pdf.setFont("helvetica","normal");pdf.setFontSize(6.3);pdf.text(c[0],x+3,27);
-      pdf.setFont("helvetica","bold");pdf.setFontSize(11);pdf.text(String(c[1]),x+3,34);
-    });
-    drawComplianceTablePdf(pdf,byArea.slice(0,9),12,44,132,"Implementacion por area usuaria",9);
-    drawComplianceTablePdf(pdf,byEmp.slice(0,9),153,44,132,"Implementacion por empresa",9);
-
-    // Brechas desglosadas para coordinar por área usuaria y empresa ejecutora.
-    pdf.setFont("helvetica","bold");pdf.setFontSize(8.5);
-    pdf.text("BRECHAS POR AREA USUARIA Y EMPRESA",12,113);
-    const brechas=emergencyGapByAreaCompany(rs);
-    let gy=119;
-    pdf.setFillColor(245,246,248);pdf.rect(12,gy,273,7,"F");pdf.setFontSize(6);
-    pdf.text("AREA USUARIA",14,gy+4.5);pdf.text("EMPRESA",51,gy+4.5);
-    pdf.text("CONTROLES NO IMPLEMENTADOS (NUMERO DE ACTIVIDADES)",110,gy+4.5);gy+=9;
-    if(!brechas.length){pdf.setFont("helvetica","normal");pdf.text("Sin controles faltantes declarados en los registros filtrados.",14,gy+4);gy+=7;}
-    brechas.slice(0,4).forEach(g=>{
-      pdf.setFont("helvetica","normal");pdf.setFontSize(5.7);
-      pdf.text(pdf.splitTextToSize(pdfSafe(g.area),32)[0],14,gy+3);
-      pdf.text(pdf.splitTextToSize(pdfSafe(g.empresa),53)[0],51,gy+3);
-      const line=g.controls.map(([c,n])=>`${c} (${n})`).join("; ");
-      const lines=pdf.splitTextToSize(pdfSafe(line),172).slice(0,2);
-      pdf.text(lines,110,gy+3);const rh=Math.max(7,lines.length*3.2+2);
-      pdf.setDrawColor(237);pdf.line(12,gy+rh,285,gy+rh);gy+=rh;
-    });
-
-
-    // Matriz de controles configurados en el aplicativo.
-    const my=171;
-    pdf.setFont("helvetica","bold");pdf.setFontSize(8);
-    pdf.text("CONTROLES REQUERIDOS POR TIPO DE TRABAJO CRITICO",12,my);
-    const types=Object.keys(EMERGENCY_CONTROLS);
-    let mx=12,yy=my+5;
-    types.forEach((work,i)=>{
-      const col=i%3,row=Math.floor(i/3),x=12+col*92,y=yy+row*14;
-      pdf.setDrawColor(225);pdf.roundedRect(x,y,88,12,1.5,1.5);
-      pdf.setFont("helvetica","bold");pdf.setFontSize(6.1);pdf.text(pdfSafe(work),x+2,y+3.6);
-      const controls=EMERGENCY_CONTROLS[work].filter(c=>!isOptionalEmergencyControl(c));
-      pdf.setFont("helvetica","normal");pdf.setFontSize(5.1);
-      const short=controls.join(" / ");pdf.text(pdf.splitTextToSize(pdfSafe(short),83).slice(0,2),x+2,y+6.5);
-    });
-    pdf.setFont("helvetica","normal");pdf.setFontSize(5.6);
-    pdf.text("Controles segun configuracion vigente del aplicativo. Los opcionales dependen de evaluacion especifica.",12,205);
-
-    // Anexos completos: sin filas ocultas ni mensajes de adicionales.
-    addEmergencyDetailPages(pdf,fecha,byArea,byEmp,brechas);
-
-    // Hoja adicional: distribucion de tipos de trabajos criticos por area usuaria.
-    addCriticalWorksAnalysisPages(pdf,rs,fecha);
-    pdf.save(`Informe_Gerencial_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,"_")}.pdf`);
-    toast("Informe gerencial ampliado generado");
-  }catch(e){console.error(e);toast("No se pudo generar el informe PDF")}
+    pdf.save(`Informe_Visual_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,'_')}.pdf`);
+    toast('Informe visual de 2 hojas generado');
+  }catch(e){console.error(e);toast('No se pudo generar el informe visual PDF')}
   finally{btn.disabled=false;btn.textContent=prev}
 }
-
-
-// Misma escala y tamaño de plano en TODAS las páginas de una misma planta.
-async function addPlantOrganizedPages(pdf,frente,fecha,frs){
-  const zones=zoneExecutiveSummary(frs,frente),areas=areaZoneSummary(frs);
-  const map=frs.length?await buildActivityCountMapImage(frs,frente):null;
-  const totalTrab=frs.reduce((v,r)=>v+Number(r.NTrabajadores||0),0);
-  const empresas=new Set(frs.map(r=>r.Empresa).filter(Boolean)).size;
-  let first=addPlantOrganizedPages._first!==false;
-  addPlantOrganizedPages._first=false;
-  const renderPage=(title,rows,kind,offset)=>{
-    if(!first)pdf.addPage();first=false;
-    addReportHeader(pdf,title,`Fecha: ${fecha}`);
-    if(map){pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('Plano de actividades criticas',12,44);
-      pdf.addImage(map,'PNG',12,48,190,137,undefined,'FAST');}
-    else {pdf.setFontSize(9);pdf.text('Sin actividades registradas en esta planta.',20,90);}
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.6);
-    pdf.setFillColor(225,38,28);pdf.circle(14,192,2.2,'F');
-    pdf.text('Cantidad de actividades criticas registradas en el sector.',20,194);
-    pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
-    pdf.text(kind==='zones'?'Resumen por zona':'Zonas por area usuaria',210,25);
-    let y=30;pdf.setFillColor(245,246,248);pdf.rect(210,y,75,8,'F');pdf.setFontSize(5.9);
-    pdf.text(kind==='zones'?'ZONA / SECTOR':'AREA / SECTOR',212,y+5);
-    pdf.text('ACT.',257,y+5,{align:'center'});pdf.text('PERS.',269,y+5,{align:'center'});
-    if(kind==='zones')pdf.text('EMP.',281,y+5,{align:'center'});y+=9;
-    rows.forEach(z=>{pdf.setFont('helvetica','normal');pdf.setFontSize(5.7);
-      const label=kind==='zones'?z.zona:`${z.area} / ${z.zona}`;
-      pdf.text(pdf.splitTextToSize(pdfSafe(label),41)[0],212,y+3.5);
-      pdf.text(String(z.actividades),257,y+3.5,{align:'center'});
-      pdf.text(String(z.personas),269,y+3.5,{align:'center'});
-      if(kind==='zones')pdf.text(String(z.empresas),281,y+3.5,{align:'center'});
-      pdf.setDrawColor(238);pdf.line(210,y+5,285,y+5);y+=5.7;
-    });
-  };
-  // 27 filas por hoja: no mezclar resumen con área usuaria.
-  const cap=27;
-  for(let i=0;i<Math.max(1,zones.length);i+=cap){
-    renderPage(i===0?`ACTIVIDADES DE ALTO RIESGO - ${frente.toUpperCase()}`:`${frente.toUpperCase()} - RESUMEN POR ZONA (${Math.floor(i/cap)+1})`,zones.slice(i,i+cap),'zones',i);
-    if(i===0){pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
-      [['Actividades',frs.length],['Trabajadores',totalTrab],['Empresas',empresas]].forEach(([label,n],j)=>{
-        const x=12+j*43;pdf.setDrawColor(220);pdf.roundedRect(x,22,39,15,2,2);pdf.setFontSize(6);pdf.text(label,x+3,27);
-        pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text(String(n),x+3,34);
-      });}
-  }
-  for(let i=0;i<areas.length;i+=cap){
-    renderPage(`${frente.toUpperCase()} - ZONAS POR AREA USUARIA (${Math.floor(i/cap)+1})`,areas.slice(i,i+cap),'areas',i);
-  }
-}
-function addEmergencyDetailPages(pdf,fecha,byArea,byEmp,brechas){
-  // Las 9 primeras filas ya aparecen en la hoja ejecutiva. El resto va íntegro en anexos.
-  const pendingA=byArea.slice(9),pendingE=byEmp.slice(9);
-  if(pendingA.length||pendingE.length){
-    pdf.addPage();addReportHeader(pdf,'EMERGENCIAS - CUMPLIMIENTO COMPLETO',`Fecha: ${fecha}`);
-    drawComplianceTablePdf(pdf,pendingA,12,30,132,'Areas usuarias - continuacion',pendingA.length);
-    drawComplianceTablePdf(pdf,pendingE,153,30,132,'Empresas - continuacion',pendingE.length);
-  }
-  // Cada par area/empresa aparece con sus controles completos, sin cortar textos.
-  let i=4;
-  while(i<brechas.length){
-    pdf.addPage();addReportHeader(pdf,'EMERGENCIAS - BRECHAS POR AREA Y EMPRESA',`Fecha: ${fecha}`);
-    let y=29;pdf.setFont('helvetica','bold');pdf.setFontSize(7);
-    pdf.text('AREA USUARIA',14,y);pdf.text('EMPRESA',54,y);pdf.text('CONTROLES NO IMPLEMENTADOS',110,y);y+=7;
-    while(i<brechas.length && y<188){
-      const g=brechas[i],line=g.controls.map(([c,n])=>`${c} (${n})`).join('; ');
-      const lines=pdf.splitTextToSize(pdfSafe(line),170);
-      const h=Math.max(8,lines.length*3.4+3);
-      if(y+h>193)break;
-      pdf.setFont('helvetica','normal');pdf.setFontSize(6.3);
-      pdf.text(pdf.splitTextToSize(pdfSafe(g.area),36)[0],14,y+3);
-      pdf.text(pdf.splitTextToSize(pdfSafe(g.empresa),51)[0],54,y+3);
-      pdf.text(lines,110,y+3);pdf.setDrawColor(235);pdf.line(12,y+h,285,y+h);y+=h;i++;
-    }
-  }
-}
-function criticalWorkAreaData(rs){
-  const works=[...new Set(rs.flatMap(r=>arr(r.TrabajoCritico).map(x=>String(x).trim()).filter(Boolean)))];
-  const areas=[...new Set(rs.map(r=>String(r.AreaUsuaria||'Sin area').trim()))].sort();
-  const matrix=areas.map(area=>{
-    const records=rs.filter(r=>String(r.AreaUsuaria||'Sin area').trim()===area);
-    const values=works.map(w=>records.reduce((n,r)=>n+arr(r.TrabajoCritico).filter(x=>String(x).trim()===w).length,0));
-    return {area,values,total:values.reduce((a,b)=>a+b,0),workers:records.reduce((a,r)=>a+Number(r.NTrabajadores||0),0)};
-  }).sort((a,b)=>b.total-a.total);
-  return {works,matrix};
-}
-function addCriticalWorksAnalysisPages(pdf,rs,fecha){
-  const {works,matrix}=criticalWorkAreaData(rs);
-  const palette=[[49,158,232],[255,89,123],[255,159,64],[245,195,62],[67,187,183],[147,100,248],[94,128,150],[208,97,173],[90,174,89],[180,124,80]];
-  const pageSize=13;
-  for(let start=0;start<Math.max(1,matrix.length);start+=pageSize){
-    pdf.addPage();addReportHeader(pdf,'ANALISIS DE TRABAJOS CRITICOS POR AREA USUARIA',`Fecha: ${fecha} | Actividades por tipo de trabajo critico`);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(7);
-    pdf.text('Cada segmento de color representa el numero de trabajos criticos de ese tipo registrados por el area.',12,25);
-    const subset=matrix.slice(start,start+pageSize),max=Math.max(1,...matrix.map(r=>r.total));
-    let y=36;
-    subset.forEach(r=>{
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.text(pdf.splitTextToSize(pdfSafe(r.area),52)[0],12,y+4);
-      let x=72;
-      r.values.forEach((v,i)=>{if(!v)return;const w=170*v/max;pdf.setFillColor(...palette[i%palette.length]);pdf.rect(x,y,w,7,'F');
-        if(w>=7){pdf.setTextColor(255);pdf.setFontSize(6.3);pdf.text(String(v),x+w/2,y+4.8,{align:'center'});pdf.setTextColor(20)}x+=w;
-      });
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.text(String(r.total),250,y+4.5);
-      pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.text(`${r.workers} trab.`,264,y+4.5);
-      y+=11;
-    });
-    let lx=12,ly=187;
-    works.forEach((w,i)=>{
-      const label=pdfSafe(w),needed=Math.min(95,10+label.length*1.3);
-      if(lx+needed>283){lx=12;ly+=6;}
-      pdf.setFillColor(...palette[i%palette.length]);pdf.rect(lx,ly-3,4,4,'F');
-      pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.text(label,lx+6,ly);lx+=needed;
-    });
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.3);
-    pdf.text('Nota: una actividad registrada puede incluir varios tipos de trabajo critico; cada tipo se cuenta por separado.',12,177);
-  }
-}
-
-function zoneExecutiveSummary(rs,frente){
-  const groups={};
-  rs.forEach(r=>{
-    const zona=String(r.Lugar||"Sin sector").trim()||"Sin sector";
-    if(!groups[zona])groups[zona]={zona,actividades:0,personas:0,emp:new Set()};
-    groups[zona].actividades+=arr(r.TrabajoCritico).length||1;
-    groups[zona].personas+=Number(r.NTrabajadores||0);
-    if(r.Empresa)groups[zona].emp.add(r.Empresa);
-  });
-  return Object.values(groups).map(z=>({zona:z.zona,actividades:z.actividades,personas:z.personas,empresas:z.emp.size}))
-    .sort((a,b)=>b.actividades-a.actividades||b.personas-a.personas);
-}
-
-function areaZoneSummary(rs){
+function zoneSummary(rs){
   const out={};
   rs.forEach(r=>{
-    const area=String(r.AreaUsuaria||"Sin area"),zona=String(r.Lugar||"Sin sector"),key=area+"|"+zona;
-    if(!out[key])out[key]={area,zona,actividades:0,personas:0};
-    out[key].actividades+=arr(r.TrabajoCritico).length||1;
-    out[key].personas+=Number(r.NTrabajadores||0);
+    const zone=r.Lugar||"Sin sector";
+    if(!out[zone])out[zone]={zone,activities:0,workers:0,companies:new Set()};
+    out[zone].activities++;out[zone].workers+=Number(r.NTrabajadores||0);if(r.Empresa)out[zone].companies.add(r.Empresa);
   });
-  return Object.values(out).sort((a,b)=>b.actividades-a.actividades||b.personas-a.personas);
+  return Object.values(out).map(z=>({...z,companies:z.companies.size,companyNames:[...z.companies]})).sort((a,b)=>b.activities-a.activities||b.workers-a.workers);
 }
-function emergencyGapByAreaCompany(rs){
-  const groups={};
-  rs.forEach(r=>{
-    const area=String(r.AreaUsuaria||"Sin area"),empresa=String(r.Empresa||"Sin empresa"),key=area+"|"+empresa;
-    const missing=missingEmergencyControlsFromRecord(r);
-    if(!missing.length)return;
-    if(!groups[key])groups[key]={area,empresa,controls:{},total:0};
-    missing.forEach(m=>{const c=String(m.control||"").trim();if(!c)return;
-      groups[key].controls[c]=(groups[key].controls[c]||0)+1;groups[key].total++;
-    });
+function addComplianceBarsPdf(pdf,data,x,y,w,h,title){
+  pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.setTextColor(20);pdf.text(pdfSafe(title),x,y);y+=7;
+  const entries=Object.entries(data).sort((a,b)=>Number(a[1])-Number(b[1]));
+  const row=Math.min(8,(h-8)/Math.max(1,entries.length));
+  entries.slice(0,14).forEach(([k,v])=>{
+    const val=Math.max(0,Math.min(100,Number(v)||0));
+    pdf.setFont("helvetica","normal");pdf.setFontSize(6.4);pdf.text(pdf.splitTextToSize(pdfSafe(k),42)[0],x,y+3);
+    pdf.setDrawColor(220);pdf.rect(x+45,y,w-62,3.8);
+    if(val>=90)pdf.setFillColor(24,165,88);else if(val>=75)pdf.setFillColor(244,196,48);else pdf.setFillColor(227,38,28);
+    pdf.rect(x+45,y,(w-62)*val/100,3.8,"F");
+    pdf.setFont("helvetica","bold");pdf.text(`${Math.round(val)}%`,x+w-14,y+3);y+=row;
   });
-  return Object.values(groups).map(g=>({...g,controls:Object.entries(g.controls).sort((a,b)=>b[1]-a[1])}))
-    .sort((a,b)=>b.total-a.total);
 }
-async function buildActivityCountMapImage(rs,frente){
+async function buildActivitiesMapImage(rs,frente){
   const img=await loadImage(mapAsset(frente));
-  // Mantener una resolución alta real del plano para evitar pixelado en el PDF.
-  const targetW=Math.min(4200,Math.max(2600,img.naturalWidth||2600));
-  const c=document.createElement("canvas");c.width=targetW;c.height=Math.round(targetW*img.naturalHeight/img.naturalWidth);
+  // Usar la resolución nativa del plano (máx. 4200 px) para no pixelar texto/líneas.
+  const scale=Math.min(1,4200/img.naturalWidth),w=Math.max(2200,Math.round(img.naturalWidth*scale));
+  const c=document.createElement("canvas");c.width=w;c.height=Math.round(w*img.naturalHeight/img.naturalWidth);
   const ctx=c.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,0,0,c.width,c.height);
-  const groups={};
-  rs.forEach(r=>{const k=normalizeSectorKey(r.Lugar);if(!groups[k])groups[k]=[];groups[k].push(r)});
+  const groups={};rs.forEach(r=>{const k=normalizeSectorKey(r.Lugar);if(!groups[k])groups[k]=[];groups[k].push(r)});
   sectorsFor(frente).forEach(s=>{
     const items=groups[normalizeSectorKey(s.nombre)]||[];if(!items.length)return;
-    const activities=items.reduce((n,r)=>n+(arr(r.TrabajoCritico).length||1),0);
-    const x=s.x/100*c.width,y=s.y/100*c.height,rad=Math.max(22,c.width/105);
-    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle="#e3261c";ctx.fill();
-    ctx.lineWidth=Math.max(4,c.width/650);ctx.strokeStyle="#fff";ctx.stroke();
-    ctx.fillStyle="#fff";ctx.font=`800 ${Math.round(rad*.95)}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(activities),x,y+1);
+    const n=items.length,x=s.x/100*c.width,y=s.y/100*c.height,rad=Math.max(22,c.width/105);
+    const color=n>=5?"#e3261c":n>=3?"#f4c430":"#18a558";
+    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.lineWidth=Math.max(4,c.width/700);ctx.strokeStyle="#fff";ctx.stroke();
+    ctx.fillStyle="#fff";ctx.font=`800 ${Math.round(rad*1.05)}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(n),x,y+1);
   });
-  // Recursos permanentes de UNACEM.
+  // Recursos permanentes UNACEM.
   (emergencyResources||[]).filter(r=>normFrente(r.frente||r.Frente)===normFrente(frente)).forEach(r=>{
     const m=resourceTypeMeta(r.tipo||r.Tipo),x=Number(r.x??r.X)/100*c.width,y=Number(r.y??r.Y)/100*c.height;
-    ctx.fillStyle=m.cls==="dea"?"#0b8f4d":m.cls==="station"?"#0068b5":"#e3261c";
-    const sz=Math.max(30,c.width/95);ctx.fillRect(x-sz/2,y-sz/2,sz,sz);ctx.strokeStyle="#fff";ctx.lineWidth=4;ctx.strokeRect(x-sz/2,y-sz/2,sz,sz);
+    ctx.fillStyle=m.cls==="dea"?"#0b8f4d":m.cls==="station"?"#0068b5":"#e3261c";const sz=Math.max(28,c.width/100);
+    ctx.fillRect(x-sz/2,y-sz/2,sz,sz);ctx.strokeStyle="#fff";ctx.lineWidth=4;ctx.strokeRect(x-sz/2,y-sz/2,sz,sz);
     ctx.fillStyle="#fff";ctx.font=`800 ${Math.round(sz*.38)}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(m.short,x,y);
-  });
-  return c.toDataURL("image/png");
-}
-
-function emergencyComplianceByRequirement(rs){
-  let required=0,implemented=0;
-  rs.forEach(r=>{const s=emergencyComplianceStatsFromRecord(r);required+=Number(s.required||0);implemented+=Number(s.implemented||0)});
-  return {required,implemented,pct:required?Math.round(implemented/required*100):0};
-}
-function emergencyComplianceGroups(rs,field){
-  const g={};
-  rs.forEach(r=>{
-    const k=String(r[field]||"Sin dato").trim()||"Sin dato",s=emergencyComplianceStatsFromRecord(r);
-    if(!g[k])g[k]={name:k,required:0,implemented:0,activities:0};
-    g[k].required+=Number(s.required||0);g[k].implemented+=Number(s.implemented||0);g[k].activities++;
-  });
-  return Object.values(g).map(x=>({...x,pct:x.required?Math.round(x.implemented/x.required*100):0}))
-    .sort((a,b)=>a.pct-b.pct||b.required-a.required);
-}
-function drawComplianceTablePdf(pdf,rows,x,y,w,title,maxRows=10){
-  pdf.setFont("helvetica","bold");pdf.setFontSize(8.5);pdf.text(title,x,y);y+=5;
-  pdf.setFillColor(245,246,248);pdf.rect(x,y,w,7,"F");pdf.setFontSize(6.2);
-  pdf.text("EMPRESA / AREA",x+2,y+4.5);pdf.text("ACT.",x+w-34,y+4.5);pdf.text("CUMPLIMIENTO",x+w-25,y+4.5);y+=8;
-  rows.slice(0,maxRows).forEach(r=>{
-    pdf.setFont("helvetica","normal");pdf.setFontSize(6);
-    pdf.text(pdf.splitTextToSize(pdfSafe(r.name),w-46)[0],x+2,y+3.5);
-    pdf.text(String(r.activities),x+w-32,y+3.5,{align:"center"});
-    const color=r.pct>=90?[24,165,88]:r.pct>=70?[244,180,0]:[225,38,28];
-    pdf.setFillColor(...color);pdf.circle(x+w-19,y+1.5,1.7,"F");
-    pdf.setTextColor(20);pdf.setFont("helvetica","bold");pdf.text(`${r.pct}%`,x+w-3,y+3.5,{align:"right"});
-    pdf.setDrawColor(235);pdf.line(x,y+5,x+w,y+5);y+=6;
-  });
-
-}
-
-function hexToRgb(h){h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
-function addHorizontalBarsPdf(pdf,data,x,y,w,h,title,mode="cantidad"){
-  pdf.setFont("helvetica","bold");pdf.setFontSize(9);pdf.text(pdfSafe(title),x,y);y+=5;
-  const entries=Object.entries(data).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,9),max=mode==="percent"?100:Math.max(1,...entries.map(x=>Number(x[1])||0));
-  const row=Math.min(6,(h-6)/Math.max(1,entries.length));
-  entries.forEach(([k,v])=>{const val=Number(v)||0;pdf.setFont("helvetica","normal");pdf.setFontSize(6.2);pdf.text(pdf.splitTextToSize(pdfSafe(k),42)[0],x,y+3);
-    pdf.setDrawColor(225);pdf.rect(x+45,y,w-62,3.5);const pct=Math.max(0,Math.min(1,val/max));pdf.setFillColor(225,38,28);pdf.rect(x+45,y,(w-62)*pct,3.5,"F");
-    pdf.setFont("helvetica","bold");pdf.text(mode==="percent"?`${val}%`:String(val),x+w-14,y+3);y+=row;
-  });
-}
-async function buildManagerialMapImage(rs,frente){
-  const img=await loadImage(mapAsset(frente)),maxW=3200,scale=Math.min(1,maxW/img.naturalWidth);
-  const c=document.createElement("canvas");c.width=Math.max(1600,Math.round(img.naturalWidth*scale));c.height=Math.round(c.width*img.naturalHeight/img.naturalWidth);
-  const ctx=c.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,0,0,c.width,c.height);
-  const groups={};rs.filter(r=>normFrente(r.Frente)===normFrente(frente)).forEach(r=>{const k=normalizeSectorKey(r.Lugar);if(!groups[k])groups[k]=[];groups[k].push(r)});
-  sectorsFor(frente).forEach(s=>{const items=groups[normalizeSectorKey(s.nombre)]||[];if(!items.length)return;const workers=items.reduce((a,r)=>a+Number(r.NTrabajadores||0),0);
-    const color=workers>=21?"#e3261c":workers>=11?"#f4c430":"#18a558",x=s.x/100*c.width,y=s.y/100*c.height,rad=Math.max(18,c.width/110);
-    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.lineWidth=Math.max(3,c.width/700);ctx.strokeStyle="#fff";ctx.stroke();
-    ctx.fillStyle="#fff";ctx.font=`800 ${Math.round(rad*1.05)}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(String(workers),x,y+1);
-  });
-  // Recursos permanentes también aparecen en el informe.
-  (emergencyResources||[]).filter(r=>normFrente(r.frente||r.Frente)===normFrente(frente)).forEach(r=>{const m=resourceTypeMeta(r.tipo||r.Tipo),x=Number(r.x??r.X)/100*c.width,y=Number(r.y??r.Y)/100*c.height;
-    ctx.fillStyle=m.cls==="dea"?"#0b8f4d":m.cls==="station"?"#0068b5":"#e3261c";ctx.fillRect(x-18,y-18,36,36);ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.strokeRect(x-18,y-18,36,36);ctx.fillStyle="#fff";ctx.font="800 15px Arial";ctx.fillText(m.short,x,y+1);
   });
   return c.toDataURL("image/png");
 }
