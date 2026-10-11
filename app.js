@@ -1115,14 +1115,14 @@ async function descargarInformeDashboard(){
       // Indicadores de la jornada: sin indicador de accidentes.
       const cards=[['ACTIVIDADES',frs.length,[225,38,28]],['TRABAJADORES',workers,[30,84,157]],['EMPRESAS',companies,[21,133,84]],['COORD. CONEXAS',cxCount,[112,65,160]],['CONTROLES EMERGENCIA',pct===null?'Sin datos':pct+'%',[220,138,25]]];
       // V12.20: mismos indicadores, reorganizados en una franja compacta para destacar arriba los trabajos críticos.
-      cards.forEach(([label,value,color],i)=>{const x=12+i*81.7;pdf.setFillColor(247,248,250);pdf.setDrawColor(226,230,236);pdf.roundedRect(x,48,77,15.5,2,2,'FD');pdf.setFont('helvetica','bold');pdf.setTextColor(...color);pdf.setFontSize(13.5);pdf.text(String(value),x+5,59.3);pdf.setFont('helvetica','normal');pdf.setTextColor(55,67,81);pdf.setFontSize(7.5);pdf.text(label,x+26,57.8)});
+      cards.forEach(([label,value,color],i)=>{const x=12+i*81.7;pdf.setFillColor(247,248,250);pdf.setDrawColor(226,230,236);pdf.roundedRect(x,48,77,15.5,2,2,'FD');pdf.setFont('helvetica','bold');pdf.setTextColor(...color);pdf.setFontSize(19);pdf.text(String(value),x+5,60.3);pdf.setFont('helvetica','bold');pdf.setTextColor(55,67,81);pdf.setFontSize(10);pdf.text(label,x+29,57.8)});
       // Resumen visual superior de todos los tipos de trabajo: datos reales, sin cantidades inventadas.
       const reportTypes={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>{reportTypes[t]=(reportTypes[t]||0)+1}));
       const workTypes=Object.entries(reportTypes).sort((a,b)=>b[1]-a[1]);
       // V12.22: fotografías por tipo de trabajo, números y nombres separados (sin superposición).
       // No se modifica ninguna otra sección del informe.
       pdf.setFillColor(239,244,250);pdf.roundedRect(12,65,396,23,2,2,'F');
-      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(9.5);
+      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(11);
       pdf.text('TIPOS DE TRABAJOS REGISTRADOS',16,69.2);
       if(workTypes.length){
         const tileW=396/workTypes.length;
@@ -1141,15 +1141,15 @@ async function descargarInformeDashboard(){
           if(type&&icons[iconFiles[type]]){
             const el=icons[iconFiles[type]],cv=document.createElement('canvas');cv.width=240;cv.height=240;
             const ctx=cv.getContext('2d');ctx.drawImage(el,0,0,240,240);
-            pdf.addImage(cv.toDataURL('image/png'),'PNG',cx-5.1,70.0,10.2,10.2,undefined,'FAST');
+            pdf.addImage(cv.toDataURL('image/png'),'PNG',cx-5.8,69.8,11.6,11.6,undefined,'FAST');
           }else{pdf.setFillColor(...cc);pdf.circle(cx,75.2,4.8,'F')}
-          pdf.setFont('helvetica','bold');pdf.setTextColor(...cc);pdf.setFontSize(12.0);
-          pdf.text(String(count),cx,84.1,{align:'center'});
+          pdf.setFont('helvetica','bold');pdf.setTextColor(...cc);pdf.setFontSize(16);
+          pdf.text(String(count),cx,84.7,{align:'center'});
           let label=name.replace(/^Trabajos en /i,'').replace(/^Izaje de Cargas$/i,'Izaje').replace(/^Aislamiento de Energía$/i,'Aislamiento').replace(/^Espacio Confinado$/i,'Espacio confinado').replace(/^Excavación y\/o Demolición$/i,'Excav. / demolición');
-          pdf.setTextColor(34,52,71);pdf.setFontSize(workTypes.length>7?6.9:7.8);
+          pdf.setTextColor(34,52,71);pdf.setFontSize(workTypes.length>7?8.2:9.8);
           const textWidth=Math.max(20,tileW-3);
           while(label.length>3&&pdf.getTextWidth(safe(label))>textWidth)label=label.slice(0,-1);
-          pdf.text(safe(label),cx,87.2,{align:'center'});
+          pdf.text(safe(label),cx,88.0,{align:'center'});
         });
       }else{pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Sin tipos de trabajo registrados',16,82)}
       // Plano: ocupar el ancho central con suficiente resolución.
@@ -1203,6 +1203,63 @@ async function descargarInformeDashboard(){
       });
       const companyRows=[...companyAreaMap.values()].sort((a,b)=>b.act-a.act||b.workers-a.workers||a.empresa.localeCompare(b.empresa));
       if(companyRows.length){
+        // V12.23: página gerencial con gráficos basados en los registros filtrados.
+        // Se conserva la tabla íntegra de detalle a continuación.
+        pdf.addPage();
+        pdf.setFillColor(225,31,26);pdf.rect(0,0,420,37,'F');
+        pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(19);
+        pdf.text('DASHBOARD | EMPRESAS Y ÁREAS USUARIAS',14,17);
+        pdf.setFont('helvetica','normal');pdf.setFontSize(10.5);
+        pdf.text(`${frente.toUpperCase()}  |  ${safe(fecha)}  |  Análisis de trabajos de alto riesgo`,14,29);
+        const totalComb=companyRows.length;
+        const dCards=[['ACTIVIDADES',frs.length,[225,38,28]],['TRABAJADORES',workers,[30,84,157]],['EMPRESAS',companies,[21,133,84]],['EMPRESA / ÁREA',totalComb,[112,65,160]]];
+        dCards.forEach(([label,val,color],i)=>{
+          const xx=14+i*100;pdf.setFillColor(246,248,251);pdf.setDrawColor(227,232,237);
+          pdf.roundedRect(xx,43,92,27,3,3,'FD');pdf.setTextColor(...color);
+          pdf.setFont('helvetica','bold');pdf.setFontSize(23);pdf.text(String(val),xx+6,59);
+          pdf.setTextColor(47,61,77);pdf.setFontSize(10.2);pdf.text(label,xx+6,66);
+        });
+        const chartPanel=(x,y,w,h,title)=>{
+          pdf.setFillColor(255,255,255);pdf.setDrawColor(220,227,235);
+          pdf.roundedRect(x,y,w,h,3,3,'FD');pdf.setFillColor(29,47,68);
+          pdf.roundedRect(x,y,w,12,3,3,'F');pdf.rect(x,y+8,w,4,'F');
+          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);
+          pdf.text(safe(title),x+5,y+8);
+        };
+        const drawBars=(items,x,y,w,h,color,maxRows=8)=>{
+          const rows=items.slice(0,maxRows),max=Math.max(1,...rows.map(a=>a.value));
+          const step=Math.min(13.5,(h-4)/Math.max(1,rows.length));
+          rows.forEach((a,i)=>{
+            const yy=y+i*step,barX=x+w*.52,barW=w*.36;
+            pdf.setFont('helvetica','normal');pdf.setTextColor(39,53,68);pdf.setFontSize(9.5);
+            pdf.text(reportFitLine(pdf,a.name,w*.47,9.5),x,yy+5.6);
+            pdf.setFillColor(236,240,245);pdf.roundedRect(barX,yy+1,barW,6,1,1,'F');
+            pdf.setFillColor(...color);pdf.roundedRect(barX,yy+1,Math.max(.5,barW*a.value/max),6,1,1,'F');
+            pdf.setFont('helvetica','bold');pdf.setFontSize(10);
+            pdf.text(String(a.value),x+w-1,yy+6,{align:'right'});
+          });
+        };
+        const byCompany=new Map(),byArea=new Map(),byType=new Map();
+        frs.forEach(r=>{
+          const co=String(r.Empresa||'Sin empresa').trim(),ar=String(r.AreaUsuaria||'Sin área').trim();
+          byCompany.set(co,(byCompany.get(co)||0)+1);
+          byArea.set(ar,(byArea.get(ar)||0)+1);
+          [...new Set(arr(r.TrabajoCritico).map(t=>String(t).trim()).filter(Boolean))].forEach(t=>byType.set(t,(byType.get(t)||0)+1));
+        });
+        const sorted=m=>[...m.entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name));
+        chartPanel(14,77,193,107,'ACTIVIDADES POR EMPRESA');
+        drawBars(sorted(byCompany),20,94,180,85,[225,38,28],7);
+        chartPanel(214,77,192,107,'ACTIVIDADES POR ÁREA USUARIA');
+        drawBars(sorted(byArea),221,95,176,83,[30,115,183],7);
+        chartPanel(14,191,193,90,'TIPOS DE TRABAJO REGISTRADOS');
+        drawBars(sorted(byType),20,208,179,67,[119,63,169],7);
+        chartPanel(214,191,192,90,'TRABAJADORES POR ÁREA USUARIA');
+        const areaWorkers=new Map();frs.forEach(r=>{
+          const a=String(r.AreaUsuaria||'Sin área').trim();areaWorkers.set(a,(areaWorkers.get(a)||0)+Number(r.NTrabajadores||0));
+        });
+        drawBars(sorted(areaWorkers),221,208,177,67,[19,143,99],7);
+        pdf.setTextColor(85,99,114);pdf.setFont('helvetica','italic');pdf.setFontSize(8.8);
+        pdf.text('Una actividad puede incluir varios tipos de trabajo; sus cantidades no deben sumarse como actividades únicas.',14,291);
         const pageRows=20;
         for(let off=0;off<companyRows.length;off+=pageRows){
           pdf.addPage();pdf.setFillColor(225,31,26);pdf.rect(0,0,420,36,'F');
