@@ -1114,7 +1114,28 @@ async function descargarInformeDashboard(){
       pdf.setFontSize(19);pdf.text(frente.toUpperCase(),14,30);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text(`INFORME PREVENTIVO  |  ${safe(fecha)}`,14,39);
       // Indicadores de la jornada: sin indicador de accidentes.
       const cards=[['ACTIVIDADES',frs.length,[225,38,28]],['TRABAJADORES',workers,[30,84,157]],['EMPRESAS',companies,[21,133,84]],['COORD. CONEXAS',cxCount,[112,65,160]],['CONTROLES EMERGENCIA',pct===null?'Sin datos':pct+'%',[220,138,25]]];
-      cards.forEach(([label,value,color],i)=>{const x=12+i*81.7;pdf.setFillColor(247,248,250);pdf.setDrawColor(226,230,236);pdf.roundedRect(x,50,77,28,3,3,'FD');pdf.setFont('helvetica','bold');pdf.setTextColor(...color);pdf.setFontSize(19);pdf.text(String(value),x+6,68);pdf.setFont('helvetica','normal');pdf.setTextColor(55,67,81);pdf.setFontSize(7.8);pdf.text(label,x+6,56.8)});
+      // V12.20: mismos indicadores, reorganizados en una franja compacta para destacar arriba los trabajos críticos.
+      cards.forEach(([label,value,color],i)=>{const x=12+i*81.7;pdf.setFillColor(247,248,250);pdf.setDrawColor(226,230,236);pdf.roundedRect(x,48,77,15.5,2,2,'FD');pdf.setFont('helvetica','bold');pdf.setTextColor(...color);pdf.setFontSize(13.5);pdf.text(String(value),x+5,59.3);pdf.setFont('helvetica','normal');pdf.setTextColor(55,67,81);pdf.setFontSize(7.5);pdf.text(label,x+26,57.8)});
+      // Resumen visual superior de todos los tipos de trabajo: datos reales, sin cantidades inventadas.
+      const reportTypes={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>{reportTypes[t]=(reportTypes[t]||0)+1}));
+      const workTypes=Object.entries(reportTypes).sort((a,b)=>b[1]-a[1]);
+      pdf.setFillColor(239,244,250);pdf.roundedRect(12,65,396,17,2,2,'F');
+      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(8.5);pdf.text('TIPOS DE TRABAJOS REGISTRADOS',16,69.5);
+      if(workTypes.length){
+        const tileW=396/workTypes.length;
+        const typeColors=[[237,83,23],[40,138,203],[121,62,173],[232,174,19],[24,139,147],[150,92,45],[225,92,33]];
+        workTypes.forEach(([name,count],i)=>{
+          const xx=12+i*tileW,cc=typeColors[i%typeColors.length],cx=xx+tileW/2;
+          if(i){pdf.setDrawColor(219,226,235);pdf.line(xx,70,xx,81)}
+          pdf.setFillColor(...cc);pdf.circle(cx-12,75,3.2,'F');
+          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(6.7);pdf.text(String(count),cx-12,76.0,{align:'center'});
+          pdf.setTextColor(34,52,71);pdf.setFont('helvetica','normal');
+          let label=name.replace(/^Trabajos en /i,'').replace(/^Izaje de Cargas$/i,'Izaje').replace(/^Aislamiento de Energía$/i,'Aislamiento').replace(/^Espacio Confinado$/i,'Espacio confinado').replace(/^Excavación y\/o Demolición$/i,'Excav. / demolición');
+          const maxW=Math.max(13,tileW-23);pdf.setFontSize(workTypes.length>8?5.4:6.6);
+          const lines=pdf.splitTextToSize(safe(label),maxW).slice(0,2);
+          lines.forEach((line,j)=>pdf.text(line,cx-6.8,74.3+j*3.1));
+        });
+      }else{pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.text('Sin tipos de trabajo registrados',16,77)}
       // Plano: ocupar el ancho central con suficiente resolución.
       pdf.setFillColor(29,47,68);pdf.roundedRect(12,84,253,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text('MAPA DE ACTIVIDADES CRÍTICAS  |  '+frente.toUpperCase(),17,92);
       pdf.setDrawColor(222,35,30);pdf.setLineWidth(.5);pdf.roundedRect(12,99,253,143,2,2,'S');
@@ -1135,11 +1156,7 @@ async function descargarInformeDashboard(){
       pdf.setFillColor(29,47,68);pdf.roundedRect(12,247,396,10,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text('PARTICIPACIÓN POR ÁREA USUARIA',17,254);
       const areaEntries=Object.entries(areaTotals).sort((a,b)=>b[1].act-a[1].act),acw=396/Math.max(1,areaEntries.length);
       areaEntries.forEach(([name,a],i)=>{const xx=12+i*acw;pdf.setFillColor(i%2?248:242,i%2?250:246,252);pdf.roundedRect(xx+1,260,acw-2,23,2,2,'F');pdf.setFont('helvetica','bold');pdf.setTextColor(32,51,73);pdf.setFontSize(12);pdf.text(safe(name),xx+5,268);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.text(`${a.act} act.  |  ${a.workers} pers.  |  ${a.sectors.size} sectores`,xx+5,277)});
-      // Tipos de trabajos: todos los tipos encontrados en los registros.
-      const typeCounts={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>typeCounts[t]=(typeCounts[t]||0)+1));
-      const types=Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]);
-      pdf.setTextColor(36,52,70);pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('TIPOS DE TRABAJO:',12,291);
-      let tx=55;types.forEach(([t,n])=>{const text=safe(`${t}: ${n}`),ww=pdf.getTextWidth(text)+8;if(tx+ww>407)return;pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.text(text,tx,291);tx+=ww});
+      // Los tipos de trabajo ahora se muestran en tarjetas visuales en la parte superior.
       pdf.setFillColor(31,43,58);pdf.rect(0,293,420,4,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(7.4);pdf.text('PROGRAMA  >  IMPLEMENTA  >  COORDINA  >  REPORTA',12,295.9);pdf.setFont('helvetica','italic');pdf.text('Unidos crecemos para construir un mundo sostenible',407,295.9,{align:'right'});
       // Anexo legible: conservar todas las combinaciones área/sector sin comprimirlas.
       if(areaRows.length){
