@@ -1141,15 +1141,15 @@ async function descargarInformeDashboard(){
           if(type&&icons[iconFiles[type]]){
             const el=icons[iconFiles[type]],cv=document.createElement('canvas');cv.width=240;cv.height=240;
             const ctx=cv.getContext('2d');ctx.drawImage(el,0,0,240,240);
-            pdf.addImage(cv.toDataURL('image/png'),'PNG',cx-5.8,69.8,11.6,11.6,undefined,'FAST');
-          }else{pdf.setFillColor(...cc);pdf.circle(cx,75.2,4.8,'F')}
-          pdf.setFont('helvetica','bold');pdf.setTextColor(...cc);pdf.setFontSize(16);
-          pdf.text(String(count),cx,84.7,{align:'center'});
+            pdf.addImage(cv.toDataURL('image/png'),'PNG',cx-12.5,71.3,11.6,11.6,undefined,'FAST');
+          }else{pdf.setFillColor(...cc);pdf.circle(cx-6.7,77.1,4.8,'F')}
+          pdf.setFont('helvetica','bold');pdf.setTextColor(...cc);pdf.setFontSize(24);
+          pdf.text(String(count),cx+5.0,81.0,{align:'center'});
           let label=name.replace(/^Trabajos en /i,'').replace(/^Izaje de Cargas$/i,'Izaje').replace(/^Aislamiento de Energía$/i,'Aislamiento').replace(/^Espacio Confinado$/i,'Espacio confinado').replace(/^Excavación y\/o Demolición$/i,'Excav. / demolición');
           pdf.setTextColor(34,52,71);pdf.setFontSize(workTypes.length>7?8.2:9.8);
           const textWidth=Math.max(20,tileW-3);
           while(label.length>3&&pdf.getTextWidth(safe(label))>textWidth)label=label.slice(0,-1);
-          pdf.text(safe(label),cx,88.0,{align:'center'});
+          pdf.text(safe(label),cx,87.0,{align:'center'});
         });
       }else{pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Sin tipos de trabajo registrados',16,82)}
       // Plano: ocupar el ancho central con suficiente resolución.
