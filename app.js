@@ -1119,35 +1119,37 @@ async function descargarInformeDashboard(){
       // Resumen visual superior de todos los tipos de trabajo: datos reales, sin cantidades inventadas.
       const reportTypes={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>{reportTypes[t]=(reportTypes[t]||0)+1}));
       const workTypes=Object.entries(reportTypes).sort((a,b)=>b[1]-a[1]);
-      pdf.setFillColor(239,244,250);pdf.roundedRect(12,65,396,17,2,2,'F');
-      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(8.5);pdf.text('TIPOS DE TRABAJOS REGISTRADOS',16,69.5);
+      // V12.21: tarjetas de tipos con cifras y textos grandes, sin reducir el resto del informe.
+      pdf.setFillColor(239,244,250);pdf.roundedRect(12,65,396,23,2,2,'F');
+      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(10.5);
+      pdf.text('TIPOS DE TRABAJOS REGISTRADOS',16,70.2);
       if(workTypes.length){
         const tileW=396/workTypes.length;
         const typeColors=[[237,83,23],[40,138,203],[121,62,173],[232,174,19],[24,139,147],[150,92,45],[225,92,33]];
         workTypes.forEach(([name,count],i)=>{
           const xx=12+i*tileW,cc=typeColors[i%typeColors.length],cx=xx+tileW/2;
-          if(i){pdf.setDrawColor(219,226,235);pdf.line(xx,70,xx,81)}
-          pdf.setFillColor(...cc);pdf.circle(cx-12,75,3.2,'F');
-          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(6.7);pdf.text(String(count),cx-12,76.0,{align:'center'});
-          pdf.setTextColor(34,52,71);pdf.setFont('helvetica','normal');
+          if(i){pdf.setDrawColor(219,226,235);pdf.line(xx,72,xx,87)}
+          pdf.setFillColor(...cc);pdf.circle(cx,78.4,5.1,'F');
+          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(12.7);pdf.text(String(count),cx,80.0,{align:'center'});
+          pdf.setTextColor(34,52,71);pdf.setFont('helvetica','bold');
           let label=name.replace(/^Trabajos en /i,'').replace(/^Izaje de Cargas$/i,'Izaje').replace(/^Aislamiento de Energía$/i,'Aislamiento').replace(/^Espacio Confinado$/i,'Espacio confinado').replace(/^Excavación y\/o Demolición$/i,'Excav. / demolición');
-          const maxW=Math.max(13,tileW-23);pdf.setFontSize(workTypes.length>8?5.4:6.6);
-          const lines=pdf.splitTextToSize(safe(label),maxW).slice(0,2);
-          lines.forEach((line,j)=>pdf.text(line,cx-6.8,74.3+j*3.1));
+          pdf.setFontSize(workTypes.length>8?7.7:9.0);
+          const lines=pdf.splitTextToSize(safe(label),Math.max(22,tileW-4)).slice(0,2);
+          lines.forEach((txt,j)=>pdf.text(txt,cx,85+j*3.1,{align:'center'}));
         });
-      }else{pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.text('Sin tipos de trabajo registrados',16,77)}
+      }else{pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Sin tipos de trabajo registrados',16,82)}
       // Plano: ocupar el ancho central con suficiente resolución.
-      pdf.setFillColor(29,47,68);pdf.roundedRect(12,84,253,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text('MAPA DE ACTIVIDADES CRÍTICAS  |  '+frente.toUpperCase(),17,92);
-      pdf.setDrawColor(222,35,30);pdf.setLineWidth(.5);pdf.roundedRect(12,99,253,143,2,2,'S');
-      if(frs.length){const map=await buildActivitiesMapImage(frs,frente),im=await loadImage(map),ratio=im.naturalWidth/im.naturalHeight;let mw=249,mh=mw/ratio;if(mh>139){mh=139;mw=mh*ratio}pdf.addImage(map,'PNG',14+(249-mw)/2,101+(139-mh)/2,mw,mh,undefined,'NONE')}
-      else{pdf.setFont('helvetica','italic');pdf.setFontSize(11);pdf.setTextColor(120);pdf.text('Sin actividades registradas para esta planta',138,167,{align:'center'})}
+      pdf.setFillColor(29,47,68);pdf.roundedRect(12,90,253,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text('MAPA DE ACTIVIDADES CRÍTICAS  |  '+frente.toUpperCase(),17,98);
+      pdf.setDrawColor(222,35,30);pdf.setLineWidth(.5);pdf.roundedRect(12,105,253,137,2,2,'S');
+      if(frs.length){const map=await buildActivitiesMapImage(frs,frente),im=await loadImage(map),ratio=im.naturalWidth/im.naturalHeight;let mw=249,mh=mw/ratio;if(mh>133){mh=133;mw=mh*ratio}pdf.addImage(map,'PNG',14+(249-mw)/2,107+(133-mh)/2,mw,mh,undefined,'NONE')}
+      else{pdf.setFont('helvetica','italic');pdf.setFontSize(11);pdf.setTextColor(120);pdf.text('Sin actividades registradas para esta planta',138,170,{align:'center'})}
       // Mostrar TODOS los sectores, no recortar a los primeros nueve.
       const zones=zoneSummary(frs),x=272,w=136;
-      pdf.setFillColor(226,38,28);pdf.roundedRect(x,84,w,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.text(`SECTORES REGISTRADOS (${zones.length})`,x+5,92);
-      pdf.setFillColor(242,245,248);pdf.rect(x,99,w,9,'F');pdf.setFontSize(7.2);pdf.setTextColor(50,64,79);pdf.text('SECTOR',x+4,105);pdf.text('ACT.',x+102,105,{align:'center'});pdf.text('PERS.',x+118,105,{align:'center'});pdf.text('EMP.',x+132,105,{align:'center'});
-      const available=134,rowH=zones.length?Math.min(9.0,available/zones.length):9;
+      pdf.setFillColor(226,38,28);pdf.roundedRect(x,90,w,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.text(`SECTORES REGISTRADOS (${zones.length})`,x+5,98);
+      pdf.setFillColor(242,245,248);pdf.rect(x,105,w,9,'F');pdf.setFontSize(7.2);pdf.setTextColor(50,64,79);pdf.text('SECTOR',x+4,111);pdf.text('ACT.',x+102,111,{align:'center'});pdf.text('PERS.',x+118,111,{align:'center'});pdf.text('EMP.',x+132,111,{align:'center'});
+      const available=128,rowH=zones.length?Math.min(9.0,available/zones.length):9;
       const font=Math.max(8.5,Math.min(9.2,rowH*1.17));
-      zones.forEach((z,i)=>{const yy=108+i*rowH;if(i%2===0){pdf.setFillColor(250,251,253);pdf.rect(x,yy,w,rowH,'F')}pdf.setFont('helvetica',i<3?'bold':'normal');pdf.setTextColor(38,52,68);line(z.zone,x+4,yy+rowH*.72,95,font);pdf.setFontSize(font);pdf.text(String(z.activities),x+102,yy+rowH*.72,{align:'center'});pdf.text(String(z.workers),x+118,yy+rowH*.72,{align:'center'});pdf.text(String(z.companies),x+132,yy+rowH*.72,{align:'center'})});
+      zones.forEach((z,i)=>{const yy=114+i*rowH;if(i%2===0){pdf.setFillColor(250,251,253);pdf.rect(x,yy,w,rowH,'F')}pdf.setFont('helvetica',i<3?'bold':'normal');pdf.setTextColor(38,52,68);line(z.zone,x+4,yy+rowH*.72,95,font);pdf.setFontSize(font);pdf.text(String(z.activities),x+102,yy+rowH*.72,{align:'center'});pdf.text(String(z.workers),x+118,yy+rowH*.72,{align:'center'});pdf.text(String(z.companies),x+132,yy+rowH*.72,{align:'center'})});
       if(!zones.length){pdf.setTextColor(105);pdf.setFontSize(9);pdf.text('Sin sectores con actividad',x+5,119)}
       // Resumen legible por área usuaria; detalle completo en anexo si hay muchos sectores.
       const areas={};frs.forEach(r=>{const area=String(r.AreaUsuaria||'Sin área').trim(),key=`${area} / ${r.Lugar||'Sin sector'}`;if(!areas[key])areas[key]={label:key,area,sector:r.Lugar||'Sin sector',act:0,workers:0};areas[key].act++;areas[key].workers+=Number(r.NTrabajadores||0)});
@@ -1174,10 +1176,49 @@ async function descargarInformeDashboard(){
         }
         pdf.setFont('helvetica','italic');pdf.setFontSize(9);pdf.setTextColor(70);pdf.text('Detalle completo de todas las áreas y sectores registrados. No se han omitido registros.',14,291);
       }
+      // V12.21: análisis completo por contratista y área usuaria, independiente del resumen por sectores.
+      // Una fila por empresa y área. Los conteos de tipos se hacen por registro y tipo seleccionado.
+      const companyAreaMap=new Map();
+      frs.forEach(r=>{
+        const empresa=String(r.Empresa||'Sin empresa').trim();
+        const area=String(r.AreaUsuaria||'Sin área').trim();
+        const key=JSON.stringify([empresa,area]);
+        if(!companyAreaMap.has(key))companyAreaMap.set(key,{empresa,area,act:0,workers:0,sectors:new Set(),types:new Map()});
+        const z=companyAreaMap.get(key);z.act++;z.workers+=Number(r.NTrabajadores||0);z.sectors.add(String(r.Lugar||'Sin sector'));
+        [...new Set(arr(r.TrabajoCritico).map(t=>String(t).trim()).filter(Boolean))].forEach(t=>z.types.set(t,(z.types.get(t)||0)+1));
+      });
+      const companyRows=[...companyAreaMap.values()].sort((a,b)=>b.act-a.act||b.workers-a.workers||a.empresa.localeCompare(b.empresa));
+      if(companyRows.length){
+        const pageRows=20;
+        for(let off=0;off<companyRows.length;off+=pageRows){
+          pdf.addPage();pdf.setFillColor(225,31,26);pdf.rect(0,0,420,36,'F');
+          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(19);
+          pdf.text('TRABAJOS DE ALTO RIESGO POR EMPRESA Y ÁREA USUARIA',14,17);
+          pdf.setFontSize(11);pdf.text(`${frente.toUpperCase()}  |  ${safe(fecha)}  |  ${companyRows.length} combinaciones empresa/área`,14,28);
+          const heads=[['EMPRESA',14],['ÁREA USUARIA',134],['ACT.',202],['TRAB.',224],['SECT.',249],['TIPOS DE TRABAJOS DE ALTO RIESGO',278]];
+          pdf.setFillColor(29,47,68);pdf.roundedRect(12,43,396,13,2,2,'F');
+          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(9.2);
+          heads.forEach(([h,x])=>pdf.text(h,x+2,51.5));
+          companyRows.slice(off,off+pageRows).forEach((r,i)=>{
+            const yy=57+i*10.8;
+            if(i%2===0){pdf.setFillColor(244,247,251);pdf.rect(12,yy,396,10.8,'F')}
+            pdf.setTextColor(34,49,65);pdf.setFont('helvetica','normal');pdf.setFontSize(9.4);
+            pdf.text(reportFitLine(pdf,r.empresa,112,9.4),16,yy+7);
+            pdf.text(reportFitLine(pdf,r.area,58,9.4),136,yy+7);
+            pdf.setFont('helvetica','bold');pdf.text(String(r.act),209,yy+7);pdf.text(String(r.workers),232,yy+7);pdf.text(String(r.sectors.size),257,yy+7);
+            pdf.setFont('helvetica','normal');pdf.setFontSize(8.2);
+            const typeText=[...r.types.entries()].sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${t.replace(/^Trabajos en /i,'').replace(/^Izaje de Cargas$/i,'Izaje')}: ${n}`).join(' · ');
+            pdf.text(reportFitLine(pdf,typeText||'Sin tipo especificado',125,8.2),280,yy+7);
+          });
+          pdf.setTextColor(84,96,110);pdf.setFont('helvetica','italic');pdf.setFontSize(8.7);
+          pdf.text(`Registros: ${frs.length}  |  Empresas: ${companies}  |  Los tipos pueden coexistir en una actividad.`,14,287);
+          pdf.text(`Página de análisis ${Math.floor(off/pageRows)+1} de ${Math.ceil(companyRows.length/pageRows)}`,405,287,{align:'right'});
+        }
+      }
 
     }
     pdf.save(`Informe_Visual_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,'_')}.pdf`);
-    toast('Informe ejecutivo de 2 hojas generado, con todos los sectores');
+    toast('Informe ejecutivo generado con análisis por empresa y área usuaria');
   }catch(e){console.error(e);toast('No se pudo generar el informe visual PDF')}
   finally{btn.disabled=false;btn.textContent=prev}
 }
