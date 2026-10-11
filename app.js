@@ -1119,23 +1119,37 @@ async function descargarInformeDashboard(){
       // Resumen visual superior de todos los tipos de trabajo: datos reales, sin cantidades inventadas.
       const reportTypes={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>{reportTypes[t]=(reportTypes[t]||0)+1}));
       const workTypes=Object.entries(reportTypes).sort((a,b)=>b[1]-a[1]);
-      // V12.21: tarjetas de tipos con cifras y textos grandes, sin reducir el resto del informe.
+      // V12.22: fotografías por tipo de trabajo, números y nombres separados (sin superposición).
+      // No se modifica ninguna otra sección del informe.
       pdf.setFillColor(239,244,250);pdf.roundedRect(12,65,396,23,2,2,'F');
-      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(10.5);
-      pdf.text('TIPOS DE TRABAJOS REGISTRADOS',16,70.2);
+      pdf.setFont('helvetica','bold');pdf.setTextColor(28,49,72);pdf.setFontSize(9.5);
+      pdf.text('TIPOS DE TRABAJOS REGISTRADOS',16,69.2);
       if(workTypes.length){
         const tileW=396/workTypes.length;
-        const typeColors=[[237,83,23],[40,138,203],[121,62,173],[232,174,19],[24,139,147],[150,92,45],[225,92,33]];
+        const typeColors={caliente:[237,83,23],altura:[40,138,203],aislamiento:[121,62,173],izaje:[232,174,19],confinado:[24,139,147],demolicion:[150,92,45],excavacion:[225,92,33]};
+        const iconFiles={caliente:'icono_caliente.png',altura:'icono_altura.png',aislamiento:'icono_aislamiento.png',izaje:'icono_izaje.png',confinado:'icono_confinado.png',demolicion:'icono_demolicion.png',excavacion:'icono_excavacion.png'};
+        const iconImages=await Promise.all(Object.values(iconFiles).map(async file=>{
+          try{const im=await loadImage(file);return [file,im]}catch(e){return [file,null]}
+        }));
+        const icons=Object.fromEntries(iconImages);
         workTypes.forEach(([name,count],i)=>{
-          const xx=12+i*tileW,cc=typeColors[i%typeColors.length],cx=xx+tileW/2;
-          if(i){pdf.setDrawColor(219,226,235);pdf.line(xx,72,xx,87)}
-          pdf.setFillColor(...cc);pdf.circle(cx,78.4,5.1,'F');
-          pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(12.7);pdf.text(String(count),cx,80.0,{align:'center'});
-          pdf.setTextColor(34,52,71);pdf.setFont('helvetica','bold');
+          const xx=12+i*tileW,cx=xx+tileW/2;
+          const normalized=String(name).toLowerCase();
+          const type=/caliente/.test(normalized)?'caliente':/altura/.test(normalized)?'altura':/aislamiento|energía|energia/.test(normalized)?'aislamiento':/izaje/.test(normalized)?'izaje':/confinado/.test(normalized)?'confinado':/demolici/.test(normalized)?'demolicion':/excavaci/.test(normalized)?'excavacion':null;
+          const cc=typeColors[type]||[93,108,125];
+          if(i){pdf.setDrawColor(219,226,235);pdf.line(xx,70,xx,87.5)}
+          if(type&&icons[iconFiles[type]]){
+            const el=icons[iconFiles[type]],cv=document.createElement('canvas');cv.width=240;cv.height=240;
+            const ctx=cv.getContext('2d');ctx.drawImage(el,0,0,240,240);
+            pdf.addImage(cv.toDataURL('image/png'),'PNG',cx-5.1,70.0,10.2,10.2,undefined,'FAST');
+          }else{pdf.setFillColor(...cc);pdf.circle(cx,75.2,4.8,'F')}
+          pdf.setFont('helvetica','bold');pdf.setTextColor(...cc);pdf.setFontSize(12.0);
+          pdf.text(String(count),cx,84.1,{align:'center'});
           let label=name.replace(/^Trabajos en /i,'').replace(/^Izaje de Cargas$/i,'Izaje').replace(/^Aislamiento de Energía$/i,'Aislamiento').replace(/^Espacio Confinado$/i,'Espacio confinado').replace(/^Excavación y\/o Demolición$/i,'Excav. / demolición');
-          pdf.setFontSize(workTypes.length>8?7.7:9.0);
-          const lines=pdf.splitTextToSize(safe(label),Math.max(22,tileW-4)).slice(0,2);
-          lines.forEach((txt,j)=>pdf.text(txt,cx,85+j*3.1,{align:'center'}));
+          pdf.setTextColor(34,52,71);pdf.setFontSize(workTypes.length>7?6.9:7.8);
+          const textWidth=Math.max(20,tileW-3);
+          while(label.length>3&&pdf.getTextWidth(safe(label))>textWidth)label=label.slice(0,-1);
+          pdf.text(safe(label),cx,87.2,{align:'center'});
         });
       }else{pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Sin tipos de trabajo registrados',16,82)}
       // Plano: ocupar el ancho central con suficiente resolución.
