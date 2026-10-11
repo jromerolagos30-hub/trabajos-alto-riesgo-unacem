@@ -1094,64 +1094,55 @@ async function reportPhoto(pdf,src,x,y,w,h){
 async function descargarInformeDashboard(){
   const rs=reportFilteredRecords();
   if(!rs.length)return toast('No hay actividades para generar el informe con los filtros seleccionados');
-  const btn=qs('btnDescargarInforme'),prev=btn.textContent;btn.disabled=true;btn.textContent='Generando informe visual...';
+  const btn=qs('btnDescargarInforme'),prev=btn.textContent;btn.disabled=true;btn.textContent='Generando informe ejecutivo...';
   try{
-    const {jsPDF}=window.jspdf,pdf=new jsPDF('l','mm','a4'),f=listFilters(),fecha=f.d||'Periodo filtrado';
+    const {jsPDF}=window.jspdf,pdf=new jsPDF('l','mm','a3'),f=listFilters(),fecha=f.d||'Periodo filtrado';
     const fronts=['Planta Nueva','Planta Antigua'];
+    const safe=(s)=>pdfSafe(String(s??''));
+    const line=(s,x,y,max,font=7)=>{pdf.setFontSize(font);let v=safe(s);while(v.length>3&&pdf.getTextWidth(v)>max)v=v.slice(0,-1);pdf.text(v,x,y)};
     for(let p=0;p<fronts.length;p++){
       if(p)pdf.addPage();const frente=fronts[p],frs=rs.filter(r=>normFrente(r.Frente)===frente);
       const workers=frs.reduce((s,r)=>s+Number(r.NTrabajadores||0),0),companies=new Set(frs.map(r=>r.Empresa).filter(Boolean)).size;
       const cx=reportConexasForFront(frs,frente,f.d||'');
       const cxCount=cx.reduce((sum,c)=>sum+Math.max(1,(c.EmpresasConexas||[]).length),0);
       const pct=frs.length?globalEmergencyCompliance(frs).pct:null;
-      // Cabecera fotográfica corporativa; imágenes independientes por planta.
-      pdf.setFillColor(224,35,28);pdf.rect(0,0,297,36,'F');
-      const photo=frente==='Planta Nueva'?'foto_informe_planta_nueva.jpg':'foto_informe_planta_antigua.jpg';
-      await reportPhoto(pdf,photo,204,0,93,36);
-      pdf.setFillColor(190,22,19);pdf.triangle(196,0,214,0,196,36,'F');
-      pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(15.2);pdf.text('ACTIVIDADES DE ALTO RIESGO',10,13);
-      pdf.setFontSize(13.2);pdf.text(frente.toUpperCase(),10,23);
-      pdf.setFont('helvetica','normal');pdf.setFontSize(8.2);pdf.text(`REPORTE PREVENTIVO  |  ${pdfSafe(fecha)}`,10,30);
-      reportCard(pdf,9,41,52,'Actividades',frs.length,[225,38,28]);
-      reportCard(pdf,66,41,52,'Trabajadores',workers,[30,84,157]);
-      reportCard(pdf,123,41,52,'Empresas',companies,[21,133,84]);
-      reportCard(pdf,180,41,52,'Coord. conexas',cxCount,[112,65,160]);
-      reportCard(pdf,237,41,51,'Controles emergencia',pct===null?'Sin datos':pct+'%',[220,138,25]);
-      // Mapa y concentraciones: posiciones de sectorización sin alterar.
-      pdf.setTextColor(28,43,62);pdf.setFont('helvetica','bold');pdf.setFontSize(10);pdf.text('¿DÓNDE SE CONCENTRAN LOS TRABAJOS?',10,72);
-      pdf.setDrawColor(229,233,237);pdf.roundedRect(9,76,191,104,2,2,'S');
-      const map=await buildActivitiesMapImage(frs,frente);
-      const im=await loadImage(map),ratio=im.naturalWidth/im.naturalHeight;
-      let mw=187,mh=mw/ratio;if(mh>100){mh=100;mw=mh*ratio}
-      pdf.addImage(map,'PNG',11+(187-mw)/2,78+(100-mh)/2,mw,mh,undefined,'NONE');
-      pdf.setFontSize(7);pdf.setTextColor(91,101,112);pdf.setFont('helvetica','normal');
-      pdf.text('Los círculos indican actividades por sector; los recursos de emergencia son referenciales.',10,184);
-      const zones=zoneSummary(frs);const px=205;
-      pdf.setFillColor(244,246,249);pdf.roundedRect(px,69,83,116,2.5,2.5,'F');
-      pdf.setTextColor(28,43,62);pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.text('ZONAS DE MAYOR ACTIVIDAD',px+4,78);
-      pdf.setFontSize(6.6);pdf.setTextColor(106,115,126);pdf.text('SECTOR',px+4,86);pdf.text('ACT.',px+58,86);pdf.text('PERS.',px+69,86);
-      let y=92;
-      zones.slice(0,9).forEach((z,i)=>{
-        if(i%2===0){pdf.setFillColor(255);pdf.rect(px+3,y-5,77,9,'F')}
-        pdf.setTextColor(30,44,59);pdf.setFont('helvetica',i<3?'bold':'normal');
-        pdf.text(reportFitLine(pdf,z.zone,51,6.4),px+4,y);
-        pdf.text(String(z.activities),px+60,y,{align:'center'});pdf.text(String(z.workers),px+73,y,{align:'center'});y+=9.6;
-      });
-      if(zones.length>9){pdf.setFont('helvetica','italic');pdf.setFontSize(6.4);pdf.setTextColor(100);pdf.text(`+ ${zones.length-9} sectores adicionales`,px+4,181)}
-      // Pie con tipo de trabajos y proceso, sin inventar accidentes.
-      pdf.setFillColor(245,247,250);pdf.roundedRect(9,190,279,12,2,2,'F');
+      // Cabecera corporativa con fotografía de la planta.
+      pdf.setFillColor(225,31,26);pdf.rect(0,0,420,44,'F');
+      await reportPhoto(pdf,frente==='Planta Nueva'?'foto_informe_planta_nueva.jpg':'foto_informe_planta_antigua.jpg',305,0,115,44);
+      pdf.setFillColor(185,17,19);pdf.triangle(291,0,311,0,291,44,'F');
+      pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(22);pdf.text('ACTIVIDADES DE ALTO RIESGO',14,17);
+      pdf.setFontSize(19);pdf.text(frente.toUpperCase(),14,30);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text(`INFORME PREVENTIVO  |  ${safe(fecha)}`,14,39);
+      // Indicadores de la jornada: sin indicador de accidentes.
+      const cards=[['ACTIVIDADES',frs.length,[225,38,28]],['TRABAJADORES',workers,[30,84,157]],['EMPRESAS',companies,[21,133,84]],['COORD. CONEXAS',cxCount,[112,65,160]],['CONTROLES EMERGENCIA',pct===null?'Sin datos':pct+'%',[220,138,25]]];
+      cards.forEach(([label,value,color],i)=>{const x=12+i*81.7;pdf.setFillColor(247,248,250);pdf.setDrawColor(226,230,236);pdf.roundedRect(x,50,77,28,3,3,'FD');pdf.setFont('helvetica','bold');pdf.setTextColor(...color);pdf.setFontSize(19);pdf.text(String(value),x+6,68);pdf.setFont('helvetica','normal');pdf.setTextColor(55,67,81);pdf.setFontSize(7.8);pdf.text(label,x+6,56.8)});
+      // Plano: ocupar el ancho central con suficiente resolución.
+      pdf.setFillColor(29,47,68);pdf.roundedRect(12,84,253,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text('MAPA DE ACTIVIDADES CRÍTICAS  |  '+frente.toUpperCase(),17,92);
+      pdf.setDrawColor(222,35,30);pdf.setLineWidth(.5);pdf.roundedRect(12,99,253,143,2,2,'S');
+      if(frs.length){const map=await buildActivitiesMapImage(frs,frente),im=await loadImage(map),ratio=im.naturalWidth/im.naturalHeight;let mw=249,mh=mw/ratio;if(mh>139){mh=139;mw=mh*ratio}pdf.addImage(map,'PNG',14+(249-mw)/2,101+(139-mh)/2,mw,mh,undefined,'NONE')}
+      else{pdf.setFont('helvetica','italic');pdf.setFontSize(11);pdf.setTextColor(120);pdf.text('Sin actividades registradas para esta planta',138,167,{align:'center'})}
+      // Mostrar TODOS los sectores, no recortar a los primeros nueve.
+      const zones=zoneSummary(frs),x=272,w=136;
+      pdf.setFillColor(226,38,28);pdf.roundedRect(x,84,w,12,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(10.5);pdf.text(`SECTORES REGISTRADOS (${zones.length})`,x+5,92);
+      pdf.setFillColor(242,245,248);pdf.rect(x,99,w,9,'F');pdf.setFontSize(7.2);pdf.setTextColor(50,64,79);pdf.text('SECTOR',x+4,105);pdf.text('ACT.',x+102,105,{align:'center'});pdf.text('PERS.',x+118,105,{align:'center'});pdf.text('EMP.',x+132,105,{align:'center'});
+      const available=134,rowH=zones.length?Math.min(8.0,available/zones.length):8;
+      const font=Math.max(5.0,Math.min(7.2,rowH*.83));
+      zones.forEach((z,i)=>{const yy=108+i*rowH;if(i%2===0){pdf.setFillColor(250,251,253);pdf.rect(x,yy,w,rowH,'F')}pdf.setFont('helvetica',i<3?'bold':'normal');pdf.setTextColor(38,52,68);line(z.zone,x+4,yy+rowH*.72,95,font);pdf.setFontSize(font);pdf.text(String(z.activities),x+102,yy+rowH*.72,{align:'center'});pdf.text(String(z.workers),x+118,yy+rowH*.72,{align:'center'});pdf.text(String(z.companies),x+132,yy+rowH*.72,{align:'center'})});
+      if(!zones.length){pdf.setTextColor(105);pdf.setFontSize(9);pdf.text('Sin sectores con actividad',x+5,119)}
+      // Desglose por área usuaria: todas las combinaciones, con fuente adaptativa.
+      const areas={};frs.forEach(r=>{const key=`${r.AreaUsuaria||'Sin área'} / ${r.Lugar||'Sin sector'}`;if(!areas[key])areas[key]={label:key,act:0,workers:0};areas[key].act++;areas[key].workers+=Number(r.NTrabajadores||0)});
+      const areaRows=Object.values(areas).sort((a,b)=>b.act-a.act||b.workers-a.workers);
+      pdf.setFillColor(29,47,68);pdf.roundedRect(12,247,253,10,2,2,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.text(`ÁREAS USUARIAS Y SECTORES (${areaRows.length})`,17,254);
+      const colCount=Math.max(1,Math.ceil(areaRows.length/5)),cw=253/colCount;
+      areaRows.forEach((r,i)=>{const col=Math.floor(i/5),row=i%5,xx=12+col*cw,yy=260+row*5.5;pdf.setFont('helvetica','normal');pdf.setTextColor(35,48,63);line(`${r.label}  |  ${r.act} act. / ${r.workers} pers.`,xx+2,yy+3.5,cw-4,Math.max(5.1,Math.min(6.5,cw/15)))});
+      // Tipos de trabajos: todos los tipos encontrados en los registros.
       const typeCounts={};frs.forEach(r=>arr(r.TrabajoCritico).forEach(t=>typeCounts[t]=(typeCounts[t]||0)+1));
-      const types=Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-      pdf.setFont('helvetica','bold');pdf.setTextColor(38,54,72);pdf.setFontSize(7.3);pdf.text('TIPOS DE TRABAJO:',13,197.5);
-      let tx=51;types.forEach(([t,n])=>{const label=reportFitLine(pdf,`${t}: ${n}`,45,6.8);pdf.setFont('helvetica','normal');pdf.text(label,tx,197.5);tx+=Math.min(49,pdf.getTextWidth(label)+9)});
-      pdf.setFillColor(31,43,58);pdf.rect(0,205,297,5,'F');
-      pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(7.4);
-      pdf.text('PROGRAMA   >   IMPLEMENTA   >   COORDINA   >   REPORTA',10,208.5);
-      pdf.setFont('helvetica','italic');pdf.setFontSize(7.1);
-      pdf.text('Unidos crecemos para construir un mundo sostenible',287,208.5,{align:'right'});
+      const types=Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]);
+      pdf.setTextColor(36,52,70);pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text('TIPOS DE TRABAJO:',12,291);
+      let tx=55;types.forEach(([t,n])=>{const text=safe(`${t}: ${n}`),ww=pdf.getTextWidth(text)+8;if(tx+ww>407)return;pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.text(text,tx,291);tx+=ww});
+      pdf.setFillColor(31,43,58);pdf.rect(0,293,420,4,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(7.4);pdf.text('PROGRAMA  >  IMPLEMENTA  >  COORDINA  >  REPORTA',12,295.9);pdf.setFont('helvetica','italic');pdf.text('Unidos crecemos para construir un mundo sostenible',407,295.9,{align:'right'});
     }
     pdf.save(`Informe_Visual_TAR_${String(fecha).replace(/[^0-9A-Za-z_-]/g,'_')}.pdf`);
-    toast('Informe visual de 2 hojas generado');
+    toast('Informe ejecutivo de 2 hojas generado, con todos los sectores');
   }catch(e){console.error(e);toast('No se pudo generar el informe visual PDF')}
   finally{btn.disabled=false;btn.textContent=prev}
 }
