@@ -29,6 +29,10 @@
 @media(max-width:700px){.emergency-resource-marker .resource-pin{min-width:24px;height:24px;font-size:9px;border-width:2px}}
 </style>
 
+<style>
+.tar-gps-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 10px}.tar-gps-toolbar small{font-size:12px;opacity:.85}
+.tar-gps-sim-label{position:absolute;z-index:29;transform:translate(-50%,calc(-100% - 13px));background:#aa5500;color:#fff;padding:3px 7px;border-radius:5px;font-size:11px;font-weight:bold;white-space:nowrap;pointer-events:none}.tar-gps-dot.tar-gps-sim{background:#ff9800;box-shadow:0 0 0 7px rgba(255,152,0,.24),0 1px 5px #222}.tar-gps-dot{position:absolute;z-index:28;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:#1687ed;border:3px solid white;box-shadow:0 0 0 7px rgba(22,135,237,.23),0 1px 5px #222;pointer-events:none}
+</style>
 </head>
 <body>
 <header class="topbar">
@@ -200,6 +204,7 @@
           </div>
           <button class="btn mini secondary" id="btnResetMarker" type="button">Limpiar punto</button>
         </div>
+        <div class="tar-gps-toolbar"><button type="button" class="btn secondary tar-gps-button">⌖ Mi ubicación GPS</button><small id="tarGpsStatusRegistro">GPS opcional · posición estimada, pendiente de validación en campo.</small></div>
         <div id="mapRegistro" class="plant-map interactive">
           <img id="registroMapImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div id="registroResourceLayer" class="resource-layer"></div>
@@ -372,6 +377,7 @@
             <span><i class="dot red"></i> 5+</span>
           </div>
         </div>
+        <div class="tar-gps-toolbar"><button type="button" class="btn secondary tar-gps-button">⌖ Mi ubicación GPS</button><small id="tarGpsStatusMapa">GPS opcional · posición estimada, pendiente de validación en campo.</small></div>
         <div id="mapGeneral" class="plant-map interactive overview">
           <img id="mapGeneralImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div id="sectorMarkers"></div>
@@ -575,6 +581,18 @@
       </div>
 
 
+
+      <article class="card" id="tarGpsSimulationAdmin">
+        <div class="card-head"><div><h2>Simulación GPS · solo administrador</h2><small>Prueba sin estar en UNACEM. No utiliza el GPS real ni guarda coordenadas.</small></div></div>
+        <div class="tar-gps-toolbar">
+          <label>Planta <select id="tarGpsSimPlant"><option>Planta Nueva</option><option>Planta Antigua</option></select></label>
+          <button type="button" class="btn secondary" id="tarGpsSimStart">Seleccionar punto en plano</button>
+          <button type="button" class="btn secondary" id="tarGpsSimCenter">Simular en el centro</button>
+          <button type="button" class="btn secondary" id="tarGpsSimStop">Finalizar simulación</button>
+        </div>
+        <small id="tarGpsSimStatus">Seleccione la planta y luego un punto en el plano de sectorización. La simulación estará claramente señalizada.</small>
+      </article>
+
       <article class="card resource-admin-card">
         <div class="card-head">
           <div>
@@ -672,6 +690,7 @@
 
 <div id="toast" class="toast hidden"></div>
 <script src="app.js"></script>
+<script src="gps-utm.js"></script>
 
 <script type="module">
   import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";

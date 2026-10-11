@@ -1,0 +1,112 @@
+{
+  "version": "1.0-preliminar",
+  "crsAssumed": "EPSG:32718",
+  "datumConfirmed": false,
+  "note": "El usuario confirmó zona UTM 18S, pero NO datum WGS84. Verificar antes de producción. Calibración aproximada desde cuadrículas visibles en renders PDF, requiere comprobación de campo.",
+  "maps": {
+    "Planta Nueva": {
+      "sourcePdf": "24727A.pdf",
+      "referenceImageWidth": 1227,
+      "referenceImageHeight": 783,
+      "northingToX": {
+        "pxPerMeter": 1.764,
+        "interceptPx": -15261040.60016,
+        "fitRmsePx": 1.095
+      },
+      "eastingToY": {
+        "pxPerMeter": -1.722,
+        "interceptPx": 504297.2,
+        "fitRmsePx": 0.418
+      },
+      "controlGridNorth": [
+        [
+          116,
+          8651450
+        ],
+        [
+          207,
+          8651500
+        ],
+        [
+          294,
+          8651550
+        ],
+        [
+          381,
+          8651600
+        ]
+      ],
+      "controlGridEast": [
+        [
+          96,
+          292800
+        ],
+        [
+          181,
+          292750
+        ],
+        [
+          268,
+          292700
+        ],
+        [
+          354,
+          292650
+        ]
+      ],
+      "coverage": "rectangulo de imagen; NO equivale a poligono de instalaciones. Delimitar zonas reales antes de deteccion dentro/fuera."
+    },
+    "Planta Antigua": {
+      "sourcePdf": "24727B.pdf",
+      "referenceImageWidth": 1227,
+      "referenceImageHeight": 783,
+      "northingToX": {
+        "pxPerMeter": 1.14,
+        "interceptPx": -9862873.00023,
+        "fitRmsePx": 0.0
+      },
+      "eastingToY": {
+        "pxPerMeter": -1.14,
+        "interceptPx": 333520.0,
+        "fitRmsePx": 0.0
+      },
+      "controlGridNorth": [
+        [
+          65,
+          8651700
+        ],
+        [
+          122,
+          8651750
+        ],
+        [
+          179,
+          8651800
+        ],
+        [
+          236,
+          8651850
+        ]
+      ],
+      "controlGridEast": [
+        [
+          70,
+          292500
+        ],
+        [
+          127,
+          292450
+        ],
+        [
+          184,
+          292400
+        ],
+        [
+          241,
+          292350
+        ]
+      ],
+      "coverage": "rectangulo de imagen; NO equivale a poligono de instalaciones. Delimitar zonas reales antes de deteccion dentro/fuera."
+    }
+  }
+}
