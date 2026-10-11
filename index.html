@@ -40,6 +40,18 @@
 .tar-gps-distance-card strong{display:block;margin-bottom:5px}.tar-gps-distance-card small{display:block;color:#5d6470;margin-top:6px}
 .tar-gps-distance-card .tar-distance{font-size:20px;font-weight:800;color:#c71a23}
 </style>
+<style>
+
+/* V12.15: recursos compactos, sin alterar marcadores de actividades ni coordenadas */
+.emergency-resource-marker{transform:translate(-50%,calc(-50% + var(--tar-resource-shift,0px)));z-index:20;transition:transform .16s ease}
+.emergency-resource-marker .resource-label{display:none!important}
+.emergency-resource-marker:focus-visible .resource-pin,.emergency-resource-marker:hover .resource-pin{outline:2px solid #f3222c;outline-offset:2px}
+@media(max-width:700px){
+ .emergency-resource-marker .resource-pin{min-width:17px!important;height:18px!important;padding:0 3px!important;border:1.5px solid #fff!important;border-radius:5px!important;font-size:7px!important;line-height:1!important;box-shadow:0 1px 4px rgba(0,0,0,.28)!important}
+ .emergency-resource-marker{min-width:22px;min-height:22px;display:flex;align-items:center;justify-content:center}
+}
+.tar-gps-distance-card{max-width:none;width:auto;margin:12px 0 18px}
+</style>
 </head>
 <body>
 <header class="topbar">

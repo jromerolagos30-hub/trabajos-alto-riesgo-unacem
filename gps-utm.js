@@ -97,7 +97,11 @@ function tarGpsDistancePanel(layerId){
  const toolbar=map?.parentElement?.querySelector('.tar-gps-toolbar')||document.getElementById(layerId==='mapResourceLayer'?'tarGpsStatusMapa':'tarGpsStatusRegistro')?.closest('.tar-gps-toolbar');
  if(!toolbar)return null;
  let panel=toolbar.parentElement.querySelector('.tar-gps-distance-card');
- if(!panel){panel=document.createElement('div');panel.className='tar-gps-distance-card';panel.hidden=true;toolbar.insertAdjacentElement('afterend',panel);}
+ if(!panel){panel=document.createElement('div');panel.className='tar-gps-distance-card';panel.hidden=true;}
+ // La ficha se ubica debajo del plano, nunca encima de las actividades.
+ const mapFrame=target.closest('#mapRegistro, #mapGeneral');
+ const destination=mapFrame || target.closest('.map-container') || toolbar;
+ if(destination.nextElementSibling!==panel)destination.insertAdjacentElement('afterend',panel);
  return panel;
 }
 function tarGpsResourceDistance(button){
@@ -125,3 +129,45 @@ function tarGpsEscape(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('.emergency-resource-marker');if(b&&b.closest('#mapResourceLayer, #registroResourceLayer'))tarGpsResourceDistance(b);
 });
+
+
+// V12.15: si un recurso tapa la etiqueta de una actividad, mover SOLO su dibujo
+// arriba o abajo. No modifica las coordenadas X/Y ni la sectorización.
+(function(){
+ let pending=false;
+ function reposition(){
+  pending=false;
+  ['mapResourceLayer','registroResourceLayer'].forEach(id=>{
+   const layer=document.getElementById(id);if(!layer)return;
+   const stage=layer.parentElement;
+   const activities=[...stage.querySelectorAll('.sector-marker,.map-marker:not(.hidden)')].filter(e=>e.offsetWidth&&e.offsetHeight);
+   const resources=[...layer.querySelectorAll('.emergency-resource-marker')];
+   resources.forEach(r=>r.style.removeProperty('--tar-resource-shift'));
+   const occupied=[];
+   const overlaps=(a,b,pad=3)=>a.left<b.right+pad&&a.right>b.left-pad&&a.top<b.bottom+pad&&a.bottom>b.top-pad;
+   resources.forEach(r=>{
+    const origin=r.getBoundingClientRect();
+    const blockers=[...activities.map(a=>a.getBoundingClientRect()),...occupied];
+    const shiftChoices=[0,-32,32,-52,52,-72,72];
+    let best=0,bestHits=Infinity;
+    for(const shift of shiftChoices){
+     const rect={left:origin.left,right:origin.right,top:origin.top+shift,bottom:origin.bottom+shift};
+     const hits=blockers.reduce((sum,b)=>sum+(overlaps(rect,b)?1:0),0);
+     if(hits<bestHits){bestHits=hits;best=shift;}
+     if(hits===0)break;
+    }
+    r.style.setProperty('--tar-resource-shift',best+'px');
+    occupied.push({left:origin.left,right:origin.right,top:origin.top+best,bottom:origin.bottom+best});
+   });
+  });
+ }
+ function schedule(){if(!pending){pending=true;requestAnimationFrame(reposition);}}
+ document.addEventListener('DOMContentLoaded',()=>{
+  ['mapResourceLayer','registroResourceLayer','sectorMarkers'].forEach(id=>{
+   const el=document.getElementById(id);
+   if(el)new MutationObserver(schedule).observe(el,{childList:true,subtree:false});
+  });
+  window.addEventListener('resize',schedule);
+  schedule();
+ });
+})();
