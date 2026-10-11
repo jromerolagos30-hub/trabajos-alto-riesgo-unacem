@@ -32,6 +32,13 @@
 <style>
 .tar-gps-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 10px}.tar-gps-toolbar small{font-size:12px;opacity:.85}
 .tar-gps-sim-label{position:absolute;z-index:29;transform:translate(-50%,calc(-100% - 13px));background:#aa5500;color:#fff;padding:3px 7px;border-radius:5px;font-size:11px;font-weight:bold;white-space:nowrap;pointer-events:none}.tar-gps-dot.tar-gps-sim{background:#ff9800;box-shadow:0 0 0 7px rgba(255,152,0,.24),0 1px 5px #222}.tar-gps-dot{position:absolute;z-index:28;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:#1687ed;border:3px solid white;box-shadow:0 0 0 7px rgba(22,135,237,.23),0 1px 5px #222;pointer-events:none}
+
+/* V12.14: acceso destacado y distancias orientativas */
+.tar-gps-button{background:#e21e26!important;color:#fff!important;border:2px solid #bb101b!important;font-weight:800!important;box-shadow:0 3px 10px rgba(226,30,38,.22);padding:12px 18px!important;border-radius:10px!important;letter-spacing:.1px}
+.tar-gps-button:hover,.tar-gps-button:focus-visible{background:#bd121d!important;box-shadow:0 0 0 3px rgba(226,30,38,.18),0 4px 12px rgba(0,0,0,.18)}
+.tar-gps-distance-card{margin:8px 0 12px;border:1px solid #d8dfe5;border-left:5px solid #e21e26;border-radius:10px;padding:12px 14px;background:#fff;color:#222;max-width:720px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.tar-gps-distance-card strong{display:block;margin-bottom:5px}.tar-gps-distance-card small{display:block;color:#5d6470;margin-top:6px}
+.tar-gps-distance-card .tar-distance{font-size:20px;font-weight:800;color:#c71a23}
 </style>
 </head>
 <body>
@@ -204,7 +211,7 @@
           </div>
           <button class="btn mini secondary" id="btnResetMarker" type="button">Limpiar punto</button>
         </div>
-        <div class="tar-gps-toolbar"><button type="button" class="btn secondary tar-gps-button">⌖ Mi ubicación GPS</button><small id="tarGpsStatusRegistro">GPS opcional · posición estimada, pendiente de validación en campo.</small></div>
+        <div class="tar-gps-toolbar"><button type="button" class="btn secondary tar-gps-button">⌖ Ubícame y explora</button><small id="tarGpsStatusRegistro">Conoce qué tan cerca estás de los recursos de emergencia · Distancia en línea recta.</small></div>
         <div id="mapRegistro" class="plant-map interactive">
           <img id="registroMapImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div id="registroResourceLayer" class="resource-layer"></div>
@@ -377,7 +384,7 @@
             <span><i class="dot red"></i> 5+</span>
           </div>
         </div>
-        <div class="tar-gps-toolbar"><button type="button" class="btn secondary tar-gps-button">⌖ Mi ubicación GPS</button><small id="tarGpsStatusMapa">GPS opcional · posición estimada, pendiente de validación en campo.</small></div>
+        <div class="tar-gps-toolbar"><button type="button" class="btn secondary tar-gps-button">⌖ Ubícame y explora</button><small id="tarGpsStatusMapa">Conoce qué tan cerca estás de los recursos de emergencia · Distancia en línea recta.</small></div>
         <div id="mapGeneral" class="plant-map interactive overview">
           <img id="mapGeneralImg" src="mapa_planta_nueva.png" alt="Mapa de evacuación Planta Nueva">
           <div id="sectorMarkers"></div>

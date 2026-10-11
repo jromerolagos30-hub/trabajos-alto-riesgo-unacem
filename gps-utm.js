@@ -23,6 +23,7 @@ function tarGpsPoint(frente,east,north){
 function tarGpsStatus(t){['tarGpsStatusRegistro','tarGpsStatusMapa'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});}
 function tarGpsClear(){document.querySelectorAll('.tar-gps-dot,.tar-gps-sim-label').forEach(el=>el.remove());}
 function tarGpsDraw(){
+ document.querySelectorAll(".tar-gps-distance-card").forEach(p=>p.hidden=true);
  tarGpsClear();if(!tarGpsPosition&&!tarGpsSimulation)return;
  const simulated=!!tarGpsSimulation;
  const p=tarGpsPosition;
@@ -87,3 +88,40 @@ function tarGpsInit(){
  ['frente','mapFiltroFrente'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>setTimeout(tarGpsDraw,50)));
 }
 document.addEventListener('DOMContentLoaded',tarGpsInit);
+
+
+// V12.14: distancia plana desde GPS o simulación hasta los recursos ubicados en el plano.
+function tarGpsDistancePanel(layerId){
+ const target=document.getElementById(layerId);if(!target)return null;
+ const map=target.closest('#mapRegistro, #mapGeneral')||target.parentElement;
+ const toolbar=map?.parentElement?.querySelector('.tar-gps-toolbar')||document.getElementById(layerId==='mapResourceLayer'?'tarGpsStatusMapa':'tarGpsStatusRegistro')?.closest('.tar-gps-toolbar');
+ if(!toolbar)return null;
+ let panel=toolbar.parentElement.querySelector('.tar-gps-distance-card');
+ if(!panel){panel=document.createElement('div');panel.className='tar-gps-distance-card';panel.hidden=true;toolbar.insertAdjacentElement('afterend',panel);}
+ return panel;
+}
+function tarGpsResourceDistance(button){
+ const layer=button.closest('#mapResourceLayer, #registroResourceLayer');if(!layer)return;
+ const panel=tarGpsDistancePanel(layer.id);if(!panel)return;
+ const frente=normFrente(document.getElementById(layer.id==='mapResourceLayer'?'mapFiltroFrente':'frente')?.value);
+ const source=tarGpsSimulation|| (tarGpsPosition?tarGpsConvert(tarGpsPosition.coords.longitude,tarGpsPosition.coords.latitude):null);
+ const label=button.querySelector('.resource-label')?.textContent?.trim()||button.title||'Recurso de emergencia';
+ const c=TAR_GPS_CALIBRATION.maps[frente];
+ const x=parseFloat(button.style.left),y=parseFloat(button.style.top);
+ let body='';
+ if(!source){body='<strong>📍 '+tarGpsEscape(label)+'</strong>Activa «Ubícame y explora» o utiliza la simulación GPS para conocer la distancia.';}
+ else if(!c||!Number.isFinite(x)||!Number.isFinite(y)||tarGpsSimulation&&tarGpsSimulation.frente!==frente){body='<strong>📍 '+tarGpsEscape(label)+'</strong>Selecciona el plano correspondiente a tu ubicación.';}
+ else {
+  const north=((x/100*c.referenceImageWidth)-c.northingToX.interceptPx)/c.northingToX.pxPerMeter;
+  const east=((y/100*c.referenceImageHeight)-c.eastingToY.interceptPx)/c.eastingToY.pxPerMeter;
+  const meters=Math.hypot(east-source.east,north-source.north);
+  const detail=button.title||label;
+  body='<strong>📍 '+tarGpsEscape(detail)+'</strong><span class="tar-distance">'+Math.round(meters).toLocaleString('es-PE')+' metros aprox.</span>'+
+  '<small>Distancia horizontal en línea recta · '+(tarGpsSimulation?'SIMULACIÓN, no es una posición real.':'GPS estimado, sujeto a precisión y calibración.')+' No considera pisos, rutas ni obstáculos. Verifica el acceso y disponibilidad en campo.</small>';
+ }
+ panel.innerHTML=body;panel.hidden=false;
+}
+function tarGpsEscape(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('.emergency-resource-marker');if(b&&b.closest('#mapResourceLayer, #registroResourceLayer'))tarGpsResourceDistance(b);
+});
