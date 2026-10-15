@@ -1581,7 +1581,7 @@ function applyRemoteData(remoteData, saveSnapshot=true){
       renderResourceAdminTable();
       if(saveSnapshot){
         try{
-          localStorage.setItem("tar_remote_snapshot_v127", JSON.stringify({
+          localStorage.setItem("tar_remote_snapshot_v1226", JSON.stringify({
             ts:Date.now(),
             data:remoteData
           }));
@@ -1591,7 +1591,7 @@ function applyRemoteData(remoteData, saveSnapshot=true){
 
 function loadCachedRemoteSnapshot(){
   try{
-    const raw=localStorage.getItem("tar_remote_snapshot_v127");
+    const raw=localStorage.getItem("tar_remote_snapshot_v1226");
     if(!raw) return false;
     const snap=JSON.parse(raw);
     if(!snap?.data) return false;
